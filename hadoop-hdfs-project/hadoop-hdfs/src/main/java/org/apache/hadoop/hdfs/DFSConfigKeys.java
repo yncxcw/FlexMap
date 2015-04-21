@@ -34,6 +34,10 @@ import org.apache.hadoop.http.HttpConfig;
 @InterfaceAudience.Private
 public class DFSConfigKeys extends CommonConfigurationKeys {
 
+  //added by wei	
+  public static final String  DFS_DYNAMIC_BLOCKSIZE_KEY = "dfs.dynamic.blocksize";
+  public static final long    DFS_DYNAMIC_BLOCKSIZE_DEFAULT = 0;
+  
   public static final String  DFS_BLOCK_SIZE_KEY = "dfs.blocksize";
   public static final long    DFS_BLOCK_SIZE_DEFAULT = 128*1024*1024;
   public static final String  DFS_REPLICATION_KEY = "dfs.replication";

@@ -17,6 +17,9 @@
  */
 package org.apache.hadoop.hdfs;
 
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DYNAMIC_BLOCKSIZE_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DYNAMIC_BLOCKSIZE_KEY;
+
 import static org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.Status.SUCCESS;
 
 import java.io.BufferedOutputStream;
@@ -152,6 +155,7 @@ public class DFSOutputStream extends FSOutputSummer
   private final long fileId;
   //added by Wei Chen
   private long blockSize;
+  private long originalBlockSize;
   private long blockIndex;
   private String firstHost;
   
@@ -1365,7 +1369,8 @@ public class DFSOutputStream extends FSOutputSummer
         nodes = lb.getLocations();
         storageTypes = lb.getStorageTypes();
         
-      //update block size added by wei
+      
+        //update block size added by wei
         if(firstHost==null || firstHost.isEmpty()){
         	        	
         	firstHost = lb.getLocations()[0].getHostName();
@@ -1373,19 +1378,21 @@ public class DFSOutputStream extends FSOutputSummer
         }
         
         
-        
+        if(dfsClient.getConfiguration().getLong(DFS_DYNAMIC_BLOCKSIZE_KEY, DFS_DYNAMIC_BLOCKSIZE_DEFAULT)==1){
+        	
+       
         if(lb.getLocations()[0].getHostName().equals(firstHost)){
         	
-        	 blockSize  = 16*1024*1024;
-        	 DFSClient.LOG.info("equal choose 16");
+        	 blockSize  = originalBlockSize;
+        	 DFSClient.LOG.info("block choose"+blockSize);
         	
         }else{
         
-             blockSize  = 32*1024*1024;
-             DFSClient.LOG.info("not equal choose 32");
+             blockSize  = originalBlockSize/2;
+             DFSClient.LOG.info("block choose"+blockSize);
         }
         
-        
+        } 
         
         //
         // Connect to first DataNode in the list.
@@ -1699,8 +1706,8 @@ public class DFSOutputStream extends FSOutputSummer
     this.dfsClient = dfsClient;
     this.src = src;
     this.fileId = stat.getFileId();
-   // this.blockSize = stat.getBlockSize();
-    this.blockSize = 16*1024*1024;
+    this.blockSize = stat.getBlockSize();
+    this.originalBlockSize = blockSize;
     this.blockIndex=0;
     this.blockReplication = stat.getReplication();
     this.fileEncryptionInfo = stat.getFileEncryptionInfo();
