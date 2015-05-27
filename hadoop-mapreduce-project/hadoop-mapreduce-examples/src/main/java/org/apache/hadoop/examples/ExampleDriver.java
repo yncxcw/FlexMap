@@ -40,6 +40,7 @@ public class ExampleDriver {
       pgd.addClass("HDFSwriter",HdfsWrite.class, "write data to hdfs file system");	
       pgd.addClass("wordcount", WordCount.class, 
                    "A map/reduce program that counts the words in the input files.");
+      pgd.addClass("multiwordcount", MutiWordcount.class, "multiwordcount class");
       pgd.addClass("wordmean", WordMean.class,
                    "A map/reduce program that counts the average length of the words in the input files.");
       pgd.addClass("wordmedian", WordMedian.class,
