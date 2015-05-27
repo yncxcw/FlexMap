@@ -167,6 +167,7 @@ public class TaskAttemptUnsuccessfulCompletionEvent implements HistoryEvent {
       datum.physMemKbytes = AvroArrayUtils.toAvro(ProgressSplitsBlock
           .arrayGetPhysMemKbytes(allSplits));
       
+      
       datum.ProgressSpeedTaskAttempt = AvroArrayUtils.toAvroDouble(progressSpeedTaskAttempt);
       datum.ProgressSpeedDFSRead = AvroArrayUtils.toAvroDouble(progressSpeedDFSRead);
       datum.ProgressSpeedDFSWrite = AvroArrayUtils.toAvroDouble(progressSpeedDFSWrite);

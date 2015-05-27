@@ -76,7 +76,12 @@ class YarnChild {
     // Initing with our JobConf allows us to avoid loading confs twice
     Limits.init(job);
     UserGroupInformation.setConfiguration(job);
-
+    
+    for(int i=0;i<args.length;i++){
+    	
+    	LOG.info("args "+i+" "+args[i]);
+    }
+    
     String host = args[0];
     int port = Integer.parseInt(args[1]);
     final InetSocketAddress address =

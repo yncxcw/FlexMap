@@ -53,6 +53,8 @@ public class MapTaskAttemptImpl extends TaskAttemptImpl {
   @Override
   public Task createRemoteTask() {
     //job file name is set in TaskAttempt, setting it null here
+	  
+	
     MapTask mapTask =
       new MapTask("", TypeConverter.fromYarn(getID()), partition,
           splitInfo.getSplitIndex(), 1); // YARN doesn't have the concept of slots per task, set it as 1.

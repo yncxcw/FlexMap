@@ -207,4 +207,16 @@ public abstract class PeriodicStatsAccumulator {
   int get(int index) {
     return values[index];
   }
+  
+  double[] toDouble(){
+	  
+	  double dValues[] = new double[values.length];
+	  
+	  for(int i=0;i<values.length;i++){
+		  
+		  dValues[i] = values[i];
+	  }
+	  
+	  return dValues;
+  }
 }

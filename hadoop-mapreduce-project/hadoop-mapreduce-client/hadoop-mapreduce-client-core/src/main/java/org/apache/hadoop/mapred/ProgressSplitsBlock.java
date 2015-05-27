@@ -18,6 +18,9 @@
 
 package org.apache.hadoop.mapred;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+ 
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 
@@ -39,6 +42,8 @@ public class ProgressSplitsBlock {
   final TimePeriodicStats        progressSpeedFileRead;
   final TimePeriodicStats        progressSpeedFileWrite;
   
+  private static final Log LOG = LogFactory.getLog(ProgressSplitsBlock.class);
+  
 
   static final double[] NULL_ARRAY = new double[0];
 
@@ -58,13 +63,13 @@ public class ProgressSplitsBlock {
   
   static final int PROGRESS_SPEED_FILEWRITE_INDEX   = 8;
   
-  static final int DEFAULT_TIME_INTERVAL = 30*1000; 
+  static final int DEFAULT_TIME_INTERVAL = 1*1000; 
 
   ProgressSplitsBlock(int numberSplits) {
     progressWallclockTime
-      = new CumulativePeriodicStats(numberSplits);
+      = new StatePeriodicStats(numberSplits);
     progressCPUTime
-      = new CumulativePeriodicStats(numberSplits);
+      = new StatePeriodicStats(numberSplits);
     progressVirtualMemoryKbytes
       = new StatePeriodicStats(numberSplits);
     progressPhysicalMemoryKbytes
@@ -85,61 +90,7 @@ public class ProgressSplitsBlock {
   // this coordinates with LoggedTaskAttempt.SplitVectorKind
   double[][] burst() {
 	   
-    double [][] results = new double[9][];
-
-    for(int i=0;i<progressWallclockTime.getValues().length;i++){
-    	
-    	results[WALLCLOCK_TIME_INDEX][i] = (double)progressWallclockTime.get(i);
-    }
-    
-    for(int i=0;i<progressCPUTime.getValues().length;i++){
-    	
-    	results[CPU_TIME_INDEX][i] = (double)progressCPUTime.get(i);
-    }
-    
-    for(int i=0;i<progressVirtualMemoryKbytes.getValues().length;i++){
-    	
-    	results[VIRTUAL_MEMORY_KBYTES_INDEX][i] = (double)progressVirtualMemoryKbytes.get(i);
-    }
-    
-    for(int i=0;i<progressPhysicalMemoryKbytes.getValues().length;i++){
-    	
-    	results[PHYSICAL_MEMORY_KBYTES_INDEX][i] = (double)progressPhysicalMemoryKbytes.get(i);
-    }
-    
-    
-    //results[WALLCLOCK_TIME_INDEX] = (double [])progressWallclockTime.getValues();
-    //results[CPU_TIME_INDEX] = progressCPUTime.getValues();
-    //results[VIRTUAL_MEMORY_KBYTES_INDEX] = progressVirtualMemoryKbytes.getValues();
-    //results[PHYSICAL_MEMORY_KBYTES_INDEX] = progressPhysicalMemoryKbytes.getValues();
-    
-    for(int i=0;i<progressSpeedTaskAttempt.getValues().size();i++){
-      
-    	 results[PROGRESS_SPEED_TASKATTEMPT_INDEX][i] = progressSpeedTaskAttempt.getValues().get(i);
-    }
-    
-    for(int i=0;i<progressSpeedDFSRead.getValues().size();i++){
-        
-   	     results[PROGRESS_SPEED_DFSREAD_INDEX][i] = progressSpeedDFSRead.getValues().get(i);
-   }
-    
-    for(int i=0;i<progressSpeedDFSWrite.getValues().size();i++){
-        
-  	     results[PROGRESS_SPEED_DFSWRITE_INDEX][i] = progressSpeedDFSWrite.getValues().get(i);
-  }
-    
-    for(int i=0;i<progressSpeedFileRead.getValues().size();i++){
-        
- 	     results[PROGRESS_SPEED_FILEREAD_INDEX][i] = progressSpeedFileRead.getValues().get(i);
- }
-   
-    for(int i=0;i<progressSpeedFileWrite.getValues().size();i++){
-        
- 	     results[PROGRESS_SPEED_FILEWRITE_INDEX][i] = progressSpeedFileWrite.getValues().get(i);
- }
-   
-    
-    return results;
+    return null;
   }
 
   static public double[] arrayGet(double[][] burstedBlock, int index) {

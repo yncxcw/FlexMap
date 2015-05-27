@@ -1535,6 +1535,12 @@ public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job,
                 job.applicationAttemptId.getAttemptId(),
                 job.metrics, job.appContext);
         job.addTask(task);
+      LOG.info("split info for task: "+i+"get split location: ");
+      for(int j=0;j<splits[j].getLocations().length;j++){
+    	  
+    	  LOG.info("node: "+splits[j].getLocations()[j]);
+      }
+      LOG.info("split index info for task: "+i+"get split location: "+splits[i].getSplitIndex().getSplitLocation()+"get start offset: "+splits[i].getSplitIndex().getStartOffset());
       }
       LOG.info("Input size for job " + job.jobId + " = " + inputLength
           + ". Number of splits = " + splits.length);

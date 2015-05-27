@@ -1368,6 +1368,7 @@ public abstract class TaskAttemptImpl implements
   private void sendLaunchedEvents() {
     JobCounterUpdateEvent jce = new JobCounterUpdateEvent(attemptId.getTaskId()
         .getJobId());
+    
     jce.addCounterUpdate(attemptId.getTaskId().getTaskType() == TaskType.MAP ?
         JobCounter.TOTAL_LAUNCHED_MAPS : JobCounter.TOTAL_LAUNCHED_REDUCES, 1);
     eventHandler.handle(jce);
@@ -1411,6 +1412,7 @@ public abstract class TaskAttemptImpl implements
       long start = getLaunchTime(); // TODO Ensure not 0
 
       if(start != 0 && now > 0){
+    	  
     	  splitsBlock.getProgressSpeedTaskAttempt().extend((double)now,(double)newProgress);
     	  
       }
@@ -1425,7 +1427,7 @@ public abstract class TaskAttemptImpl implements
     	  splitsBlock.getProgressSpeedHdfsRead().extend((double)now,(double)hdfsRecordsReadCounter.getValue());
     	    	  
       } 
-      
+    
       Counter hdfsRecordsWriteCounter = counters.findCounter(TaskCounter.REDUCE_OUTPUT_RECORDS);
       if(hdfsRecordsWriteCounter != null && hdfsRecordsWriteCounter.getValue() <= Integer.MAX_VALUE){
     	  
@@ -1769,6 +1771,15 @@ public abstract class TaskAttemptImpl implements
     int containerNodePort =
         this.container == null ? -1 : this.container.getNodeId().getPort();
     if (attemptId.getTaskId().getTaskType() == TaskType.MAP) {
+    	
+     //added by wei for test
+     double[] testHDFSreadSpeed=this.getProgressSplitBlock().getProgressSpeedHdfsRead().getValue();  
+     
+     for(int i=0;i<testHDFSreadSpeed.length;i++){
+    	 
+    	 LOG.info("HDFSSpeed: index "+i+"value "+testHDFSreadSpeed[i]);
+     }
+     
       MapAttemptFinishedEvent mfe =
          new MapAttemptFinishedEvent(TypeConverter.fromYarn(attemptId),
          TypeConverter.fromYarn(attemptId.getTaskId().getTaskType()),
@@ -1781,6 +1792,13 @@ public abstract class TaskAttemptImpl implements
          this.reportedStatus.stateString,
          getCounters(),
          getProgressSplitBlock().burst());
+      //added by wei for test
+         for(int i=0;i<getProgressSplitBlock().burst().length;i++){
+        	 LOG.info("line"+i);
+             for(int j=0;j<getProgressSplitBlock().burst()[i].length;j++)	 
+         	    LOG.info("data:"+i+" "+j+" "+getProgressSplitBlock().burst()[i][j]);        	 
+         }
+         
          eventHandler.handle(
            new JobHistoryEvent(attemptId.getTaskId().getJobId(), mfe));
     } else {

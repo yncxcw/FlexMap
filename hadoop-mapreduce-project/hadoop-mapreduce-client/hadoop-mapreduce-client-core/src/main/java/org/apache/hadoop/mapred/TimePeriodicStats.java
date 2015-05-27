@@ -27,8 +27,26 @@ public abstract class TimePeriodicStats {
 	    
 	  static class StatsetState {
 	    double    oldValue = 0;
-	    int    oldTime  = 0;
-	    double currentAccumulation = 0;
+	    int       oldTime  = 0;
+	    double    currentAccumulation = 0;
+	  }
+	 
+	  public double[] toDouble(){
+		  
+		  if(values.size()==0){
+			  			  
+			  return new double[0];
+		  }
+		  
+		  double[] Dvalues =new double [values.size()];
+		  		  
+		  for(int i=0; i<values.size();i++){
+			  
+			  Dvalues[i] = values.get(i).doubleValue();
+		  }
+		  
+		  return Dvalues;
+		  
 	  }
 	  
 	  protected abstract void extendInternal(int newTime, double newValue);

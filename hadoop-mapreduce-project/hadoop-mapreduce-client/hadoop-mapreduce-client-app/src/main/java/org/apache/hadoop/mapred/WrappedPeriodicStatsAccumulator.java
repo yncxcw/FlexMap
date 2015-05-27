@@ -18,27 +18,55 @@
 
 package org.apache.hadoop.mapred;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.mapreduce.v2.app.job.impl.TaskAttemptImpl;
+
 //Workaround for PeriodicStateAccumulator being package access
 public class WrappedPeriodicStatsAccumulator {
 
-  private PeriodicStatsAccumulator real; 
+  private PeriodicStatsAccumulator real=null; 
   
-  private TimePeriodicStats timeReal;
+  private TimePeriodicStats timeReal=null;
+  
+  private static final Log LOG = LogFactory.getLog(WrappedPeriodicStatsAccumulator.class);
 
   public WrappedPeriodicStatsAccumulator(PeriodicStatsAccumulator real) {
+	LOG.info("initialize the rael");  
     this.real = real;
   }
   public WrappedPeriodicStatsAccumulator(TimePeriodicStats timeReal) {
+	LOG.info("initialize the timeReal");
 	this.timeReal = timeReal;
 }
+ 
+  public double[] getValue(){
+	  
+	  if(real!=null){
+		  
+		  LOG.info("real is not null and size of real is"+real.toDouble().length);
+		  return real.toDouble();
+	  }
+	  
+	  if(timeReal!=null){
+		  
+		  LOG.info("timereal is not null and size of real is"+timeReal.toDouble().length);
+		  return timeReal.toDouble();
+	  }
+	  
+	  LOG.info("timereal is null and real is also null");
+	  
+	  return null;
+  }
   
   public void extend(double newParam, double newValue) {
+	  
 	  
 	 if(real !=  null){ 
        real.extend(newParam, (int)newValue);
 	   return;
 	 }
-	 if(timeReal != null){
+	 if(timeReal != null){ 
 	   timeReal.extend((int)newParam, newValue);
 	   return;
 	 }
