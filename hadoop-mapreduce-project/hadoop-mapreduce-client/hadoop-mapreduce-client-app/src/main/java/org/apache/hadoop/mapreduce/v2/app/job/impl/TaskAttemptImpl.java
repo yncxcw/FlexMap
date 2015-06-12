@@ -1547,7 +1547,10 @@ public abstract class TaskAttemptImpl implements
       Container container = cEvent.getContainer();
       taskAttempt.container = container;
       // this is a _real_ Task (classic Hadoop mapred flavor):
+      
       taskAttempt.remoteTask = taskAttempt.createRemoteTask();
+      
+      
       taskAttempt.jvmID =
           new WrappedJvmID(taskAttempt.remoteTask.getTaskID().getJobID(),
               taskAttempt.remoteTask.isMapTask(),

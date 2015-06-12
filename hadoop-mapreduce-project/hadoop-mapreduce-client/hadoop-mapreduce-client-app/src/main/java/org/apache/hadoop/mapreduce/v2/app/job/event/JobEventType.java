@@ -57,5 +57,6 @@ public enum JobEventType {
   
   //Producer:RMContainerAllocator
   JOB_UPDATED_NODES,
-  JOB_AM_REBOOT
+  JOB_AM_REBOOT,
+  JOB_TASK_ATTEMPT_CONTAINER_ASSIGNED
 }

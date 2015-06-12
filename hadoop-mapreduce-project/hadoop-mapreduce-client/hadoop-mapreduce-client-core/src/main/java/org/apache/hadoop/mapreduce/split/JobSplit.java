@@ -169,6 +169,29 @@ public class JobSplit {
       this(new TaskSplitIndex("",startOffset), locations, inputDataLength);
     }
     
+    public boolean equals(TaskSplitMetaInfo splitMetaInfo){
+    	
+    	if(!this.splitIndex.equals(splitMetaInfo.splitIndex)){
+    		
+    		return false;
+    	}
+    	
+    	if(this.inputDataLength != splitMetaInfo.inputDataLength){
+    		
+    		return false;
+    	}
+    	
+    	for(int i=0;i<locations.length;i++){
+    		
+    		if(this.locations[i]!=splitMetaInfo.locations[i]){
+    			
+    			return false;
+    		}
+    	}
+    	
+    	return true;
+    }
+    
     public TaskSplitIndex getSplitIndex() {
       return splitIndex;
     }
@@ -191,7 +214,7 @@ public class JobSplit {
    * This represents the meta information about the task split that the 
    * task gets
    */
-  public static class TaskSplitIndex {
+  public static class TaskSplitIndex{
     private String splitLocation;
     private long startOffset;
     public TaskSplitIndex(){
@@ -207,6 +230,19 @@ public class JobSplit {
     public String getSplitLocation() {
       return splitLocation;
     }
+    
+    
+   public boolean equals(TaskSplitIndex splitIndex){
+    	
+    	if(this.splitLocation==splitIndex.splitLocation && this.startOffset==splitIndex.startOffset)
+    	{
+    	   return true;
+    	}else{
+    		
+    	   return false;
+    	}
+    }
+    
     public void readFields(DataInput in) throws IOException {
       splitLocation = Text.readString(in);
       startOffset = WritableUtils.readVLong(in);

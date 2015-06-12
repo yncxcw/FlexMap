@@ -487,6 +487,8 @@ class JobSubmitter {
       
       Path submitJobFile = JobSubmissionFiles.getJobConfPath(submitJobDir);
       
+      LOG.info("submit dir path:"+submitJobDir.toString());
+      
       // Create the splits for the job
       LOG.debug("Creating splits at " + jtFs.makeQualified(submitJobDir));
       int maps = writeSplits(job, submitJobDir);

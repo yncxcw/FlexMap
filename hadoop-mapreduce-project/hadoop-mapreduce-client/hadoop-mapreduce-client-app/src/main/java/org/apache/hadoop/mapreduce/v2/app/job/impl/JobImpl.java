@@ -48,7 +48,10 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapred.JobACLsManager;
 import org.apache.hadoop.mapred.JobConf;
+import org.apache.hadoop.mapred.MultiMapTaskAttemptImpl;
 import org.apache.hadoop.mapred.TaskCompletionEvent;
+import org.apache.hadoop.mapred.TaskDataProvision;
+import org.apache.hadoop.mapred.DefaultTaskDataProvision;
 import org.apache.hadoop.mapreduce.Counters;
 import org.apache.hadoop.mapreduce.JobACL;
 import org.apache.hadoop.mapreduce.JobContext;
@@ -100,6 +103,7 @@ import org.apache.hadoop.mapreduce.v2.app.job.event.JobFinishEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.JobSetupFailedEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.JobStartEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.JobTaskAttemptCompletedEvent;
+import org.apache.hadoop.mapreduce.v2.app.job.event.JobTaskAttemptContainerAssinged;
 import org.apache.hadoop.mapreduce.v2.app.job.event.JobTaskAttemptFetchFailureEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.JobTaskEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.JobUpdatedNodesEvent;
@@ -179,6 +183,8 @@ public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job,
   private final Object tasksSyncHandle = new Object();
   private final Set<TaskId> mapTasks = new LinkedHashSet<TaskId>();
   private final Set<TaskId> reduceTasks = new LinkedHashSet<TaskId>();
+  
+  
   /**
    * maps nodes to tasks that have run on those nodes
    */
@@ -218,6 +224,8 @@ public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job,
   private List<TaskCompletionEvent> mapAttemptCompletionEvents;
   private List<Integer> taskCompletionIdxToMapCompletionIdx;
   private final List<String> diagnostics = new ArrayList<String>();
+//added by wei
+  private TaskDataProvision taskDataProvision;
   
   //task/attempt related datastructures
   private final Map<TaskId, Integer> successAttemptCompletionEventNoMap = 
@@ -323,6 +331,9 @@ public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job,
           .addTransition(JobStateInternal.RUNNING, JobStateInternal.RUNNING,
               JobEventType.JOB_TASK_ATTEMPT_COMPLETED,
               TASK_ATTEMPT_COMPLETED_EVENT_TRANSITION)
+          .addTransition(JobStateInternal.RUNNING, JobStateInternal.RUNNING, 
+        	 JobEventType.JOB_TASK_ATTEMPT_CONTAINER_ASSIGNED,
+        	 new TaskAttemptContainerAssignedTransition())
           .addTransition
               (JobStateInternal.RUNNING,
               EnumSet.of(JobStateInternal.RUNNING,
@@ -677,6 +688,7 @@ public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job,
     this.oldJobId = TypeConverter.fromYarn(jobId);
     this.committer = committer;
     this.newApiCommitter = newApiCommitter;
+    
 
     this.taskAttemptListener = taskAttemptListener;
     this.eventHandler = eventHandler;
@@ -1464,9 +1476,11 @@ public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job,
             job.conf.getInt(MRJobConfig.MAP_FAILURES_MAX_PERCENT, 0);
         job.allowedReduceFailuresPercent =
             job.conf.getInt(MRJobConfig.REDUCE_FAILURES_MAXPERCENT, 0);
-
+        job.taskDataProvision = new DefaultTaskDataProvision(job.jobContext);
+        job.taskDataProvision.initialize(taskSplitMetaInfo);
         // create the Tasks but don't start them yet
-        createMapTasks(job, inputLength, taskSplitMetaInfo);
+        createMultiMapTasks(job,inputLength);
+        //createMapTasks(job, inputLength, taskSplitMetaInfo);
         createReduceTasks(job);
 
         job.metrics.endPreparingJob(job);
@@ -1521,6 +1535,28 @@ public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job,
       }
     }
 
+    //for test
+    private void createMultiMapTasks(JobImpl job, long inputLength){
+    	
+    	String[] splitNodeList = job.taskDataProvision.getSplitsNodeList();
+    	
+    	for(int i=0;i<splitNodeList.length;i++){
+    		String[] split = new String[1];
+    		split[0]=splitNodeList[i];
+    		TaskImpl task =
+    	            new MapTaskImpl(job.jobId, i,
+    	                job.eventHandler, 
+    	                job.remoteJobConfFile, 
+    	                job.conf, split,
+    	                job.taskAttemptListener, 
+    	                job.jobToken, job.jobCredentials,
+    	                job.clock,
+    	                job.applicationAttemptId.getAttemptId(),
+    	                job.metrics, job.appContext);
+    	        job.addTask(task);
+    	}
+    	
+    }
     private void createMapTasks(JobImpl job, long inputLength,
                                 TaskSplitMetaInfo[] splits) {
       for (int i=0; i < job.numMapTasks; ++i) {
@@ -1782,6 +1818,9 @@ public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job,
       job.finished(JobStateInternal.KILLED);
     }
   }
+  
+  
+  
 
   private static class KillInitedJobTransition
   implements SingleArcTransition<JobImpl, JobEvent> {
@@ -1819,6 +1858,37 @@ public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job,
     }
   }
 
+  
+  private static class TaskAttemptContainerAssignedTransition
+  implements SingleArcTransition<JobImpl, JobEvent> {
+    @Override
+    public void transition(JobImpl job, JobEvent event) {
+         	
+    JobTaskAttemptContainerAssinged jca = (JobTaskAttemptContainerAssinged) event;
+    
+     String host = jca.getContainer().getNodeId().getHost();
+     TaskAttemptId taskAttemptId = jca.getTaskAttemptID();
+     TaskId taskId = taskAttemptId.getTaskId();
+          
+     LOG.info("task id for container assigned: "+taskId.getId());
+     
+     TaskSplitMetaInfo[] splitMetaInfo=job.taskDataProvision.getAllSplitOnNode(host);
+    
+     Task task = job.tasks.get(taskId);
+     TaskAttempt attempt = task.getAttempt(taskAttemptId);
+     
+     if(attempt instanceof MultiMapTaskAttemptImpl){
+    	 
+    	 LOG.info("attempt"+taskAttemptId.getId()+"set splitInfo length: "+splitMetaInfo.length);
+    	 
+    	 ((MultiMapTaskAttemptImpl) attempt).setSplitInfos(splitMetaInfo);
+     
+     }
+        
+    }
+  }
+  
+  
   private static class TaskAttemptCompletedEventTransition implements
       SingleArcTransition<JobImpl, JobEvent> {
     @Override

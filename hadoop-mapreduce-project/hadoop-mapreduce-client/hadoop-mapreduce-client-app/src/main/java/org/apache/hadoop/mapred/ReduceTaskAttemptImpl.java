@@ -57,6 +57,7 @@ public class ReduceTaskAttemptImpl extends TaskAttemptImpl {
           numMapTasks, 1); // YARN doesn't have the concept of slots per task, set it as 1.
   reduceTask.setUser(conf.get(MRJobConfig.USER_NAME));
   reduceTask.setConf(conf);
+ // reduceTask.setTaskType(TaskType.REDUCE);
     return reduceTask;
   }
 

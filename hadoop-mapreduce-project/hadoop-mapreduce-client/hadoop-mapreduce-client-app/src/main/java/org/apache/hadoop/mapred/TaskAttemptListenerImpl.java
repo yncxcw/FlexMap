@@ -438,6 +438,22 @@ public class TaskAttemptListenerImpl extends CompositeService
         // longer pending, and further request should ask it to exit.
         org.apache.hadoop.mapred.Task task =
             jvmIDToActiveAttemptMap.remove(wJvmID);
+        if(task instanceof org.apache.hadoop.mapred.MultiMapTask){
+        
+        	LOG.info("get multi map task");
+        
+        }else if(task instanceof org.apache.hadoop.mapred.MapTask){
+        	
+        	LOG.info("get map task");
+        	
+        }else if(task instanceof org.apache.hadoop.mapred.ReduceTask){
+        	
+        	LOG.info("get reduce task");
+        
+        }else{
+        	
+            LOG.info("get error");	
+        }
         launchedJVMs.remove(wJvmID);
         LOG.info("JVM with ID: " + jvmId + " given task: " + task.getTaskID());
         jvmTask = new JvmTask(task, false);

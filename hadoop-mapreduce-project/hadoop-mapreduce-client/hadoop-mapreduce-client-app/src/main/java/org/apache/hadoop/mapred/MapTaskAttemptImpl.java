@@ -60,6 +60,7 @@ public class MapTaskAttemptImpl extends TaskAttemptImpl {
           splitInfo.getSplitIndex(), 1); // YARN doesn't have the concept of slots per task, set it as 1.
     mapTask.setUser(conf.get(MRJobConfig.USER_NAME));
     mapTask.setConf(conf);
+    //mapTask.setTaskType(TaskType.MAP);
     return mapTask;
   }
 

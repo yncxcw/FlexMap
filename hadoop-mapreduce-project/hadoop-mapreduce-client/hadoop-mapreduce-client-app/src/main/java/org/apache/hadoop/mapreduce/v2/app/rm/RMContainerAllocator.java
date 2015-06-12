@@ -53,6 +53,7 @@ import org.apache.hadoop.mapreduce.v2.app.job.event.JobCounterUpdateEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.JobDiagnosticsUpdateEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.JobEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.JobEventType;
+import org.apache.hadoop.mapreduce.v2.app.job.event.JobTaskAttemptContainerAssinged;
 import org.apache.hadoop.mapreduce.v2.app.job.event.JobUpdatedNodesEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptContainerAssignedEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptDiagnosticsUpdateEvent;
@@ -1038,14 +1039,18 @@ public class RMContainerAllocator extends RMContainerRequestor
                                     ContainerRequest assigned) {
       // Update resource requests
       decContainerReq(assigned);
+      
+      LOG.info("host is:"+allocated.getNodeId().getHost());
 
+      //send the container to JobIml to provision data to this task
+      eventHandler.handle(new JobTaskAttemptContainerAssinged(assigned.attemptID,allocated));
       // send the container-assigned event to task attempt
       eventHandler.handle(new TaskAttemptContainerAssignedEvent(
           assigned.attemptID, allocated, applicationACLs));
 
       assignedRequests.add(allocated, assigned.attemptID);
 
-      if (LOG.isDebugEnabled()) {
+      {
         LOG.info("Assigned container (" + allocated + ") "
             + " to task " + assigned.attemptID + " on node "
             + allocated.getNodeId().toString());

@@ -26,12 +26,19 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.io.Writable;
 
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 /**
  * Task abstraction that can be serialized, implements the writable interface.
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public class JvmTask implements Writable {
+
+  static final Log LOG = LogFactory.getLog(JvmTask.class);	
+	
   Task t;
   boolean shouldDie;
   public JvmTask(Task t, boolean shouldDie) {
@@ -48,6 +55,7 @@ public class JvmTask implements Writable {
   public void write(DataOutput out) throws IOException {
     out.writeBoolean(shouldDie);
     if (t != null) {
+      LOG.info("write Jvm Task");	
       out.writeBoolean(true);
       out.writeBoolean(t.isMapTask());
       t.write(out);
@@ -61,10 +69,29 @@ public class JvmTask implements Writable {
     if (taskComing) {
       boolean isMap = in.readBoolean();
       if (isMap) {
-        t = new MapTask();
+    	LOG.info("construct multi mapTask");	  
+        t = new MultiMapTask();
       } else {
+    	LOG.info("construct reduceTask");	  
         t = new ReduceTask();
       }
+      
+      /*	
+      int taskType=in.readInt();
+      if(taskType==TaskType.MAP.ordinal()){
+    	  
+    	  t=new MapTask();
+    	  
+      }else if(taskType==TaskType.REDUCE.ordinal()){
+    	  
+    	  t=new ReduceTask();
+    	  
+      }else if(taskType==TaskType.MULTIMAP.ordinal()){
+    	  
+    	  t=new MultiMapTask();
+      }
+      */
+      LOG.info("read map task");
       t.readFields(in);
     }
   }

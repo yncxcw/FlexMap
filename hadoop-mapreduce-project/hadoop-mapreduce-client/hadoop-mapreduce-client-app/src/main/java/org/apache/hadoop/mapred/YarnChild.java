@@ -35,6 +35,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.mapred.MultiMapTask;
 import org.apache.hadoop.mapreduce.MRConfig;
 import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.TaskType;
@@ -141,6 +142,20 @@ class YarnChild {
       }
 
       task = myTask.getTask();
+      
+      if(task instanceof org.apache.hadoop.mapred.MultiMapTask){
+    	  
+    	  LOG.info("yarnchild Multi Map task");
+    	  
+      }else if(task instanceof org.apache.hadoop.mapred.MapTask){
+    	  
+    	  LOG.info("yarnchild Map task");
+      
+      }else{
+    	  
+    	  LOG.info("yarnchild error");
+      }
+      
       YarnChild.taskid = task.getTaskID();
 
       // Create the job-conf and set credentials

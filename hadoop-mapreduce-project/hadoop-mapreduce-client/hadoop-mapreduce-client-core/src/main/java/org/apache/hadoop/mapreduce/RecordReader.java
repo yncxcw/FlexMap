@@ -84,4 +84,14 @@ public abstract class RecordReader<KEYIN, VALUEIN> implements Closeable {
    * Close the record reader.
    */
   public abstract void close() throws IOException;
+
+  /**
+   *  we do nothong here just to support multiNewRecorderReader
+ * @throws InterruptedException 
+ * @throws IOException 
+   */
+  
+  public void initialize() throws IOException, InterruptedException {
+	
+  }
 }

@@ -53,6 +53,7 @@ import org.apache.hadoop.io.WritableUtils;
 import org.apache.hadoop.io.serializer.Deserializer;
 import org.apache.hadoop.io.serializer.SerializationFactory;
 import org.apache.hadoop.mapred.IFile.Writer;
+import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.FileSystemCounter;
 import org.apache.hadoop.mapreduce.OutputCommitter;
 import org.apache.hadoop.mapreduce.TaskCounter;
@@ -82,6 +83,9 @@ abstract public class Task implements Writable, Configurable {
   public static String MERGED_OUTPUT_PREFIX = ".merged";
   public static final long DEFAULT_COMBINE_RECORDS_BEFORE_PROGRESS = 10000;
   
+  TaskType taskType;
+  
+    
   /**
    * @deprecated Provided for compatibility. Use {@link TaskCounter} instead.
    */
@@ -248,6 +252,27 @@ abstract public class Task implements Writable, Configurable {
   }
 
   /**
+   * Set the type for this task.
+   * @return null
+   */
+  public void setTaskType(TaskType taskType){
+	  
+	  this.taskType=taskType;
+  }
+  
+  
+  /**
+   * Get the type for this task.
+   * @return the task type
+   */
+  public TaskType getTaskType(){
+	  
+	  return taskType;
+  }
+  
+  
+  
+  /**
    * Set the job token secret 
    * @param tokenSecret the secret
    */
@@ -351,6 +376,7 @@ abstract public class Task implements Writable, Configurable {
   protected static List<Statistics> getFsStatistics(Path path, Configuration conf) throws IOException {
     List<Statistics> matchedStats = new ArrayList<FileSystem.Statistics>();
     path = path.getFileSystem(conf).makeQualified(path);
+    LOG.info("current split path is"+path);
     String scheme = path.toUri().getScheme();
     for (Statistics stats : FileSystem.getAllStatistics()) {
       if (stats.getScheme().equals(scheme)) {
@@ -470,6 +496,7 @@ abstract public class Task implements Writable, Configurable {
   ////////////////////////////////////////////
 
   public void write(DataOutput out) throws IOException {
+	LOG.info("TASK serial partion:"+partition);
     Text.writeString(out, jobFile);
     taskId.write(out);
     out.writeInt(partition);
@@ -511,6 +538,7 @@ abstract public class Task implements Writable, Configurable {
     }
     user = StringInterner.weakIntern(Text.readString(in));
     extraData.readFields(in);
+    LOG.info("finish serial read splitinfo");
   }
 
   @Override

@@ -28,6 +28,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.IntBuffer;
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
@@ -80,17 +81,19 @@ import org.apache.hadoop.util.StringUtils;
 @InterfaceStability.Unstable
 public class MapTask extends Task {
   /**
-   * The size of each record in the index file for the map-outputs.
+   * The size of each record in the index file for thprivatee map-outputs.
    */
   public static final int MAP_OUTPUT_INDEX_RECORD_LENGTH = 24;
 
+  
+  //private LinkedList<TaskSplitIndex> splitMetaInfo;
   private TaskSplitIndex splitMetaInfo = new TaskSplitIndex();
   private final static int APPROX_HEADER_LENGTH = 150;
 
   private static final Log LOG = LogFactory.getLog(MapTask.class.getName());
 
-  private Progress mapPhase;
-  private Progress sortPhase;
+  public Progress mapPhase;
+  public Progress sortPhase;
   
   {   // set phase for this task
     setPhase(TaskStatus.Phase.MAP); 
@@ -123,6 +126,7 @@ public class MapTask extends Task {
   public void write(DataOutput out) throws IOException {
     super.write(out);
     if (isMapOrReduce()) {
+      LOG.info("serial write splitinfo");	
       splitMetaInfo.write(out);
       splitMetaInfo = null;
     }
@@ -131,8 +135,9 @@ public class MapTask extends Task {
   @Override
   public void readFields(DataInput in) throws IOException {
     super.readFields(in);
-    if (isMapOrReduce()) {
+    if (isMapOrReduce()) {     		
       splitMetaInfo.readFields(in);
+      LOG.info("finish serial read splitinfo");
     }
   }
 
@@ -304,6 +309,9 @@ public class MapTask extends Task {
   @Override
   public void run(final JobConf job, final TaskUmbilicalProtocol umbilical)
     throws IOException, ClassNotFoundException, InterruptedException {
+	
+	LOG.info("Map run");  
+	  
     this.umbilical = umbilical;
 
     if (isMapTask()) {
@@ -350,7 +358,7 @@ public class MapTask extends Task {
   }
 
  @SuppressWarnings("unchecked")
- private <T> T getSplitDetails(Path file, long offset) 
+ protected <T> T getSplitDetails(Path file, long offset) 
   throws IOException {
    FileSystem fs = file.getFileSystem(conf);
    FSDataInputStream inFile = fs.open(file);
@@ -413,7 +421,7 @@ public class MapTask extends Task {
   }
 
   @SuppressWarnings("unchecked")
-  private <INKEY,INVALUE,OUTKEY,OUTVALUE>
+  public <INKEY,INVALUE,OUTKEY,OUTVALUE>
   void runOldMapper(final JobConf job,
                     final TaskSplitIndex splitIndex,
                     final TaskUmbilicalProtocol umbilical,
@@ -613,7 +621,7 @@ public class MapTask extends Task {
     }
   }
 
-  private class NewDirectOutputCollector<K,V>
+  class NewDirectOutputCollector<K,V>
   extends org.apache.hadoop.mapreduce.RecordWriter<K,V> {
     private final org.apache.hadoop.mapreduce.RecordWriter out;
 
@@ -680,7 +688,7 @@ public class MapTask extends Task {
     }
   }
   
-  private class NewOutputCollector<K,V>
+  public class NewOutputCollector<K,V>
     extends org.apache.hadoop.mapreduce.RecordWriter<K,V> {
     private final MapOutputCollector<K,V> collector;
     private final org.apache.hadoop.mapreduce.Partitioner<K,V> partitioner;
@@ -726,7 +734,7 @@ public class MapTask extends Task {
   }
 
   @SuppressWarnings("unchecked")
-  private <INKEY,INVALUE,OUTKEY,OUTVALUE>
+  public <INKEY,INVALUE,OUTKEY,OUTVALUE>
   void runNewMapper(final JobConf job,
                     final TaskSplitIndex splitIndex,
                     final TaskUmbilicalProtocol umbilical,
@@ -750,7 +758,7 @@ public class MapTask extends Task {
     org.apache.hadoop.mapreduce.InputSplit split = null;
     split = getSplitDetails(new Path(splitIndex.getSplitLocation()),
         splitIndex.getStartOffset());
-    LOG.info("Processing split: " + split);
+    LOG.info("Map task NewMapper Processing split: " + split);
 
     org.apache.hadoop.mapreduce.RecordReader<INKEY,INVALUE> input =
       new NewTrackingRecordReader<INKEY,INVALUE>
@@ -1896,7 +1904,7 @@ public class MapTask extends Task {
                          new Path(mapId.toString()),
                          job.getOutputKeyComparator(), reporter, sortSegments,
                          null, spilledRecordsCounter, sortPhase.phase(),
-                         TaskType.MAP);
+                         org.apache.hadoop.mapreduce.TaskType.MAP);
 
           //write merged output to disk
           long segmentStart = finalOut.getPos();
@@ -1989,7 +1997,7 @@ public class MapTask extends Task {
     }
   }
   
-  private <INKEY, INVALUE, OUTKEY, OUTVALUE>
+  protected <INKEY, INVALUE, OUTKEY, OUTVALUE>
   void closeQuietly(
       org.apache.hadoop.mapreduce.RecordReader<INKEY, INVALUE> c) {
     if (c != null) {
@@ -2002,7 +2010,7 @@ public class MapTask extends Task {
     }
   }
 
-  private <INKEY, INVALUE, OUTKEY, OUTVALUE>
+  protected <INKEY, INVALUE, OUTKEY, OUTVALUE>
   void closeQuietly(
       org.apache.hadoop.mapreduce.RecordWriter<OUTKEY, OUTVALUE> c,
       org.apache.hadoop.mapreduce.Mapper<INKEY,INVALUE,OUTKEY,OUTVALUE>.Context
