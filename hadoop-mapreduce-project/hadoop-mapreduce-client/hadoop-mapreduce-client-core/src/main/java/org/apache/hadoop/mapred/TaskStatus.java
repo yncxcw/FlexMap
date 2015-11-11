@@ -63,7 +63,8 @@ public abstract class TaskStatus implements Writable, Cloneable {
     
   private long startTime; //in ms
   private long finishTime; 
-  private long outputSize = -1L;
+  private long currentTime = -1;
+  private long outputSize  = -1L;
     
   private volatile Phase phase = Phase.STARTING; 
   private Counters counters;
@@ -198,6 +199,22 @@ public abstract class TaskStatus implements Writable, Cloneable {
       		StringUtils.stringifyException(new Exception()));
     }
   }
+  
+  /**
+   *Get map begin time Once the map phase truly begins to execute, we want to eliminate the effects  
+   *from jvm setting up overhead. So here we just consider the map running time.
+   * 
+  */
+  public long getMapBeginTime(){
+	  	  
+	  return 0;
+
+  }
+  
+  public void setMapBeginTime(long mapBeginTime){}
+  
+  
+  
   /**
    * Get shuffle finish time for the task. If shuffle finish time was 
    * not set due to shuffle/sort/finish phases ending within same
@@ -227,6 +244,8 @@ public abstract class TaskStatus implements Writable, Cloneable {
   public long getMapFinishTime() {
     return 0;
   }
+  
+  
   
   /**
    * Set map phase finish time. 
@@ -259,7 +278,37 @@ public abstract class TaskStatus implements Writable, Cloneable {
   public long getStartTime() {
     return startTime;
   }
+  
+  /**
+   * Get currentTime of task
+   * @return 0 if currentTime is not set else return start time.
+   */
+  
+  public long getCurrentTime(){
+	  
+	  return currentTime;
+  }
 
+  /**
+   * set Currenttime of the task each time it hearts beat to AppMaster
+   * @param currentTime
+   */
+  
+  public void setCurrentTime(long currentTime){
+	  
+	  if(currentTime > 0){
+		  
+		  this.currentTime = currentTime;
+	  
+	  }else{
+		  LOG.error("Trying to set illegal startTime for task : " + taskid +
+		          ".Stack trace is : " +
+		          StringUtils.stringifyException(new Exception()));
+		  
+	  }	  
+  }
+  
+  
   /**
    * Set startTime of the task if start time is greater than zero.
    * @param startTime start time
@@ -465,6 +514,7 @@ public abstract class TaskStatus implements Writable, Cloneable {
     Text.writeString(out, diagnosticInfo);
     Text.writeString(out, stateString);
     WritableUtils.writeEnum(out, phase);
+    out.writeLong(currentTime);
     out.writeLong(startTime);
     out.writeLong(finishTime);
     out.writeBoolean(includeAllCounters);
@@ -481,6 +531,7 @@ public abstract class TaskStatus implements Writable, Cloneable {
     setDiagnosticInfo(StringInterner.weakIntern(Text.readString(in)));
     setStateString(StringInterner.weakIntern(Text.readString(in)));
     this.phase = WritableUtils.readEnum(in, Phase.class); 
+    this.currentTime = in.readLong();
     this.startTime = in.readLong(); 
     this.finishTime = in.readLong(); 
     counters = new Counters();

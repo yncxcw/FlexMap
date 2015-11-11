@@ -21,6 +21,7 @@ package org.apache.hadoop.examples;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.Date;
 import java.util.StringTokenizer;
 
 import org.apache.hadoop.conf.Configuration;
@@ -172,8 +173,7 @@ public class WordMean extends Configured implements Tool {
 
     Configuration conf = getConf();
 
-    @SuppressWarnings("deprecation")
-    Job job = new Job(conf, "word mean");
+    Job job = Job.getInstance(conf, "word mean");
     job.setJarByClass(WordMean.class);
     job.setMapperClass(WordMeanMapper.class);
     job.setCombinerClass(WordMeanReducer.class);
@@ -183,10 +183,19 @@ public class WordMean extends Configured implements Tool {
     FileInputFormat.addInputPath(job, new Path(args[0]));
     Path outputpath = new Path(args[1]);
     FileOutputFormat.setOutputPath(job, outputpath);
-    boolean result = job.waitForCompletion(true);
-    mean = readAndCalcMean(outputpath, conf);
+    Date startTime = new Date();
+    System.out.println("Job started: " + startTime);
 
-    return (result ? 0 : 1);
+    Boolean waitforCompletion = job.waitForCompletion(true) ;
+
+    Date end_time = new Date();
+    System.out.println("Job ended: " + end_time);
+    System.out.println("The job took " +
+        (end_time.getTime() - startTime.getTime()) /1000 + " seconds.");
+   
+    
+
+    return (waitforCompletion? 0 : 1);
   }
 
   /**

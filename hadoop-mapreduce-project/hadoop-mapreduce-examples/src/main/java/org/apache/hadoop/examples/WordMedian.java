@@ -21,6 +21,7 @@ package org.apache.hadoop.examples;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.Date;
 import java.util.StringTokenizer;
 
 import org.apache.hadoop.conf.Configuration;
@@ -181,8 +182,7 @@ public class WordMedian extends Configured implements Tool {
     setConf(new Configuration());
     Configuration conf = getConf();
 
-    @SuppressWarnings("deprecation")
-    Job job = new Job(conf, "word median");
+    Job job = Job.getInstance(conf, "word median");
     job.setJarByClass(WordMedian.class);
     job.setMapperClass(WordMedianMapper.class);
     job.setCombinerClass(WordMedianReducer.class);
@@ -191,7 +191,16 @@ public class WordMedian extends Configured implements Tool {
     job.setOutputValueClass(IntWritable.class);
     FileInputFormat.addInputPath(job, new Path(args[0]));
     FileOutputFormat.setOutputPath(job, new Path(args[1]));
-    boolean result = job.waitForCompletion(true);
+    Date startTime = new Date();
+    System.out.println("Job started: " + startTime);
+
+    Boolean waitforCompletion = job.waitForCompletion(true) ;
+
+    Date end_time = new Date();
+    System.out.println("Job ended: " + end_time);
+    System.out.println("The job took " +
+        (end_time.getTime() - startTime.getTime()) /1000 + " seconds.");
+    
 
     // Wait for JOB 1 -- get middle value to check for Median
 
@@ -203,7 +212,7 @@ public class WordMedian extends Configured implements Tool {
 
     median = readAndFindMedian(args[1], medianIndex1, medianIndex2, conf);
 
-    return (result ? 0 : 1);
+    return (waitforCompletion ? 0 : 1);
   }
 
   public double getMedian() {

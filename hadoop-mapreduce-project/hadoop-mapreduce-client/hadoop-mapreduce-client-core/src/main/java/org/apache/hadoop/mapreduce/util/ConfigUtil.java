@@ -52,6 +52,12 @@ public class ConfigUtil {
   @SuppressWarnings("deprecation")
   private static void addDeprecatedKeys()  {
     Configuration.addDeprecations(new DeprecationDelta[] {
+      new DeprecationDelta("mareduce.job.block.limit",
+    		    	MRJobConfig.BLOCKS_UNIT_LIMIT),
+      new DeprecationDelta("mareduce.job.block.fastlimit",
+    		    	MRJobConfig.BLOCKS_UNIT_FAST_LIMIT),		 		    	
+      new DeprecationDelta("mareduce.job.block.unit",
+    	MRJobConfig.BOCK_UNIT_UNIT),		
       new DeprecationDelta("mapred.temp.dir",
         MRConfig.TEMP_DIR),
       new DeprecationDelta("mapred.local.dir",

@@ -20,6 +20,7 @@ package org.apache.hadoop.mapreduce.v2.app.rm;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -29,6 +30,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
@@ -73,12 +75,14 @@ import org.apache.hadoop.yarn.api.records.NodeReport;
 import org.apache.hadoop.yarn.api.records.NodeState;
 import org.apache.hadoop.yarn.api.records.Priority;
 import org.apache.hadoop.yarn.api.records.Resource;
+import org.apache.hadoop.yarn.api.records.ResourceRequest;
 import org.apache.hadoop.yarn.api.records.Token;
 import org.apache.hadoop.yarn.client.api.NMTokenCache;
 import org.apache.hadoop.yarn.exceptions.ApplicationAttemptNotFoundException;
 import org.apache.hadoop.yarn.exceptions.ApplicationMasterNotRegisteredException;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
+import org.apache.hadoop.yarn.factories.RecordFactory;
 import org.apache.hadoop.yarn.security.AMRMTokenIdentifier;
 import org.apache.hadoop.yarn.util.Clock;
 import org.apache.hadoop.yarn.util.RackResolver;
@@ -96,6 +100,8 @@ public class RMContainerAllocator extends RMContainerRequestor
   
   public static final 
   float DEFAULT_COMPLETED_MAPS_PERCENT_FOR_REDUCE_SLOWSTART = 0.05f;
+  
+  public static final int REDUCE_REQUEST_SIZE = 4;
   
   private static final Priority PRIORITY_FAST_FAIL_MAP;
   private static final Priority PRIORITY_REDUCE;
@@ -173,11 +179,14 @@ public class RMContainerAllocator extends RMContainerRequestor
     = new LinkedBlockingQueue<ContainerAllocatorEvent>();
 
   private ScheduleStats scheduleStats = new ScheduleStats();
+  
+  private List<String> nodeSpeedList;
 
   public RMContainerAllocator(ClientService clientService, AppContext context) {
     super(clientService, context);
     this.stopped = new AtomicBoolean(false);
     this.clock = context.getClock();
+    this.nodeSpeedList = new ArrayList<String>();
   }
 
   @Override
@@ -249,6 +258,7 @@ public class RMContainerAllocator extends RMContainerRequestor
 
     int completedMaps = getJob().getCompletedMaps();
     int completedTasks = completedMaps + getJob().getCompletedReduces();
+    //if a new map task is completed, we need to re-think if we need to schedule reduce 
     if ((lastCompletedTasks != completedTasks) ||
           (scheduledRequests.maps.size() > 0)) {
       lastCompletedTasks = completedTasks;
@@ -326,6 +336,7 @@ public class RMContainerAllocator extends RMContainerRequestor
     recalculateReduceSchedule = true;
     if (event.getType() == ContainerAllocator.EventType.CONTAINER_REQ) {
       ContainerRequestEvent reqEvent = (ContainerRequestEvent) event;
+      
       JobId jobId = getJob().getID();
       Resource supportedMaxContainerCapability = getMaxContainerCapability();
       if (reqEvent.getAttemptID().getTaskId().getTaskType().equals(TaskType.MAP)) {
@@ -354,6 +365,7 @@ public class RMContainerAllocator extends RMContainerRequestor
         reqEvent.getCapability().setMemory(mapResourceRequest.getMemory());
         reqEvent.getCapability().setVirtualCores(
           mapResourceRequest.getVirtualCores());
+        
         scheduledRequests.addMap(reqEvent);//maps are immediately scheduled
       } else {
         if (reduceResourceRequest.equals(Resources.none())) {
@@ -391,11 +403,14 @@ public class RMContainerAllocator extends RMContainerRequestor
         }
       }
       
-    } else if (
-        event.getType() == ContainerAllocator.EventType.CONTAINER_DEALLOCATE) {
+    }else if(event.getType() == ContainerAllocator.EventType.CONTAINER_NODE_SPEED){
+    	
+    	ContainerNodeSpeedUpdateEvent nodeSpeedEvent  = (ContainerNodeSpeedUpdateEvent) event;
+    	
+    	this.nodeSpeedList = nodeSpeedEvent.getNodeSpeed();
+    	    	
+    }else if (event.getType() == ContainerAllocator.EventType.CONTAINER_DEALLOCATE) {
   
-      LOG.info("Processing the event " + event.toString());
-
       TaskAttemptId aId = event.getAttemptID();
       
       boolean removed = scheduledRequests.remove(aId);
@@ -467,9 +482,9 @@ public class RMContainerAllocator extends RMContainerRequestor
         LOG.info("Ramping down all scheduled reduces:"
             + scheduledRequests.reduces.size());
         for (ContainerRequest req : scheduledRequests.reduces.values()) {
-          pendingReduces.add(req);
+          pendingReduces.add(req);           //apply for resource again 
         }
-        scheduledRequests.reduces.clear();
+        scheduledRequests.reduces.clear();   //these resource for these reduce will not be used again
  
         //do further checking to find the number of map requests that were
         //hanging around for a while
@@ -625,10 +640,65 @@ public class RMContainerAllocator extends RMContainerRequestor
       rampDownReduces(rampDown);
     }
   }
+  
+  public void AddReduceFastHost(ContainerRequest request){
+	  
+	  LOG.info("Addreduce Fast Host,node speed size is:"+nodeSpeedList.size());
+	  
+	  int reduceRequestNodeSize = (int) (this.nodeSpeedList.size()*0.5);
+	  
+	  int reduceRequestSize;
+	  
+	  if(reduceRequestNodeSize > REDUCE_REQUEST_SIZE){
+		  
+		  reduceRequestSize = REDUCE_REQUEST_SIZE;
+	  
+	  }else{
+		  
+		  reduceRequestSize = reduceRequestNodeSize;  
+		  
+	  }
+	   
+	  List<Integer> numberList = new ArrayList<Integer>();
+	  List<Integer> resultList = new ArrayList<Integer>();
+      for(int i=0;i < reduceRequestNodeSize;i++){
+    	  numberList.add(i);
+      }	
+	  Random random = new Random();   
+		
+	  for(int i=0;i<reduceRequestSize;i++){
+		 int rand = Math.abs(random.nextInt())%numberList.size();
+		 resultList.add(numberList.get(rand));
+		 numberList.remove(rand);	
+	   
+	  }
+	  
+	  String [] hosts = new String[reduceRequestSize];
+	  
+	  
+	  for(int i=0;i<reduceRequestSize;i++){
+		  
+		  hosts[i]=this.nodeSpeedList.get(resultList.get(i));
+		  LOG.info("request for reduce:"+request.attemptID+" host is: "+ hosts[i]);
+	  }
+	  
+	  
+	  String [] racks =new String[1];
+	  racks[0]="/default-rack";
+	  
+	  request.hosts = hosts;
+	  request.racks = racks;
+	  
+	  request.rackRelaxLocality=true;
+	  request.anyRelaxLocality=false;
+	  request.nodeRelaxLocality=true;
+	  
+  }
 
   @Private
   public void scheduleAllReduces() {
     for (ContainerRequest req : pendingReduces) {
+      AddReduceFastHost(req);
       scheduledRequests.addReduce(req);
     }
     pendingReduces.clear();
@@ -637,8 +707,9 @@ public class RMContainerAllocator extends RMContainerRequestor
   @Private
   public void rampUpReduces(int rampUp) {
     //more reduce to be scheduled
-    for (int i = 0; i < rampUp; i++) {
+    for (int i = 0; i < rampUp; i++) {	
       ContainerRequest request = pendingReduces.removeFirst();
+      AddReduceFastHost(request);
       scheduledRequests.addReduce(request);
     }
   }
@@ -718,19 +789,14 @@ public class RMContainerAllocator extends RMContainerRequestor
     List<ContainerStatus> finishedContainers = response.getCompletedContainersStatuses();
     if (newContainers.size() + finishedContainers.size() > 0
         || !headRoom.equals(newHeadRoom)) {
-      //something changed
+      //something changed either some maptasks finish or some containers are released
       recalculateReduceSchedule = true;
       if (LOG.isDebugEnabled() && !headRoom.equals(newHeadRoom)) {
         LOG.debug("headroom=" + newHeadRoom);
       }
     }
-
-    if (LOG.isDebugEnabled()) {
-      for (Container cont : newContainers) {
-        LOG.debug("Received new Container :" + cont);
-      }
-    }
-
+    
+   
     //Called on each allocation. Will know about newly blacklisted/added hosts.
     computeIgnoreBlacklisting();
 
@@ -805,7 +871,7 @@ public class RMContainerAllocator extends RMContainerRequestor
       for (int i = 0; i < 2; ++i) {
         HashMap<TaskAttemptId, Container> taskSet = i == 0 ? assignedRequests.maps
             : assignedRequests.reduces;
-        // kill running containers
+        // kill running containers on unusable nodes
         for (Map.Entry<TaskAttemptId, Container> entry : taskSet.entrySet()) {
           TaskAttemptId tid = entry.getKey();
           NodeId taskAttemptNodeId = entry.getValue().getNodeId();
@@ -1045,8 +1111,7 @@ public class RMContainerAllocator extends RMContainerRequestor
       //send the container to JobIml to provision data to this task
       eventHandler.handle(new JobTaskAttemptContainerAssinged(assigned.attemptID,allocated));
       // send the container-assigned event to task attempt
-      eventHandler.handle(new TaskAttemptContainerAssignedEvent(
-          assigned.attemptID, allocated, applicationACLs));
+      eventHandler.handle(new TaskAttemptContainerAssignedEvent(assigned.attemptID, allocated, applicationACLs));
 
       assignedRequests.add(allocated, assigned.attemptID);
 
@@ -1155,16 +1220,19 @@ public class RMContainerAllocator extends RMContainerRequestor
       ContainerRequest assigned = null;
       //try to assign to reduces if present
       if (assigned == null && reduces.size() > 0) {
-        TaskAttemptId tId = reduces.keySet().iterator().next();
-        assigned = reduces.remove(tId);
-        LOG.info("Assigned to reduce");
+    	 LOG.info("get reduce from: "+allocated.getNodeId().getHost());
+         TaskAttemptId tId = reduces.keySet().iterator().next();
+           assigned = reduces.remove(tId);	  
       }
+      
       return assigned;
+  
     }
     
     @SuppressWarnings("unchecked")
     private void assignMapsWithLocality(List<Container> allocatedContainers) {
       // try to assign to all nodes first to match node local
+    	
       Iterator<Container> it = allocatedContainers.iterator();
       while(it.hasNext() && maps.size() > 0){
         Container allocated = it.next();        
@@ -1188,9 +1256,9 @@ public class RMContainerAllocator extends RMContainerRequestor
             jce.addCounterUpdate(JobCounter.DATA_LOCAL_MAPS, 1);
             eventHandler.handle(jce);
             hostLocalAssigned++;
-            if (LOG.isDebugEnabled()) {
-              LOG.debug("Assigned based on host match " + host);
-            }
+           
+            LOG.info("local map task"+tId.toString()+ "assigned Assigned based on host match " + host);
+        
             break;
           }
         }
@@ -1218,9 +1286,7 @@ public class RMContainerAllocator extends RMContainerRequestor
             jce.addCounterUpdate(JobCounter.RACK_LOCAL_MAPS, 1);
             eventHandler.handle(jce);
             rackLocalAssigned++;
-            if (LOG.isDebugEnabled()) {
-              LOG.debug("Assigned based on rack match " + rack);
-            }
+            LOG.info("rack map task"+tId.toString()+ "assigned Assigned based on rack match " + rack);
             break;
           }
         }
@@ -1240,9 +1306,7 @@ public class RMContainerAllocator extends RMContainerRequestor
           new JobCounterUpdateEvent(assigned.attemptID.getTaskId().getJobId());
         jce.addCounterUpdate(JobCounter.OTHER_LOCAL_MAPS, 1);
         eventHandler.handle(jce);
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Assigned based on * match");
-        }
+        LOG.info("any map task"+tId.toString()+ "assigned Assigned based on any match ");
       }
     }
   }
@@ -1289,8 +1353,8 @@ public class RMContainerAllocator extends RMContainerRequestor
       for (int i = 0; i < toPreempt && reduceList.size() > 0; i++) {
         TaskAttemptId id = reduceList.remove(0);//remove the one on top
         LOG.info("Preempting " + id);
-        preemptionWaitingReduces.add(id);
-        eventHandler.handle(new TaskAttemptKillEvent(id, RAMPDOWN_DIAGNOSTIC));
+        preemptionWaitingReduces.add(id);                                             //record the id of preemption task
+        eventHandler.handle(new TaskAttemptKillEvent(id, RAMPDOWN_DIAGNOSTIC));       //kill this task
       }
     }
     

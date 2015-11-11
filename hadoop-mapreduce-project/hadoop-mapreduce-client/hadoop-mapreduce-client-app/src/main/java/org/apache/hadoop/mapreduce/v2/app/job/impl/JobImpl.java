@@ -24,11 +24,14 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -105,6 +108,7 @@ import org.apache.hadoop.mapreduce.v2.app.job.event.JobStartEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.JobTaskAttemptCompletedEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.JobTaskAttemptContainerAssinged;
 import org.apache.hadoop.mapreduce.v2.app.job.event.JobTaskAttemptFetchFailureEvent;
+import org.apache.hadoop.mapreduce.v2.app.job.event.JobTaskAttemptSpeedUpdateEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.JobTaskEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.JobUpdatedNodesEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptEvent;
@@ -114,6 +118,8 @@ import org.apache.hadoop.mapreduce.v2.app.job.event.TaskEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.TaskEventType;
 import org.apache.hadoop.mapreduce.v2.app.job.event.TaskRecoverEvent;
 import org.apache.hadoop.mapreduce.v2.app.metrics.MRAppMetrics;
+import org.apache.hadoop.mapreduce.v2.app.rm.ContainerAllocator;
+import org.apache.hadoop.mapreduce.v2.app.rm.ContainerNodeSpeedUpdateEvent;
 import org.apache.hadoop.mapreduce.v2.util.MRApps;
 import org.apache.hadoop.mapreduce.v2.util.MRBuilderUtils;
 import org.apache.hadoop.security.Credentials;
@@ -145,11 +151,15 @@ public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job,
 
   private static final TaskAttemptCompletionEvent[]
     EMPTY_TASK_ATTEMPT_COMPLETION_EVENTS = new TaskAttemptCompletionEvent[0];
+  
+  private boolean PROBE = false;
 
   private static final TaskCompletionEvent[]
     EMPTY_TASK_COMPLETION_EVENTS = new TaskCompletionEvent[0];
 
   private static final Log LOG = LogFactory.getLog(JobImpl.class);
+  
+  private boolean IS_MULTIMAP = true;
 
   //The maximum fraction of fetch failures allowed for a map
   private float maxAllowedFetchFailuresFraction;
@@ -181,8 +191,17 @@ public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job,
   private final org.apache.hadoop.mapreduce.JobID oldJobId;
   private final TaskAttemptListener taskAttemptListener;
   private final Object tasksSyncHandle = new Object();
+  private final Object probeTaskSyncHandle = new Object();
   private final Set<TaskId> mapTasks = new LinkedHashSet<TaskId>();
+ 
+  
   private final Set<TaskId> reduceTasks = new LinkedHashSet<TaskId>();
+  private final Object splitSynHandle = new Object();
+ 
+  private final Set<TaskId> assignedMapTasks = new LinkedHashSet<TaskId>();  //map task which could be assigned data 
+  private final Object assignedSynHandle = new Object();
+  //this data structure stores information about Task id and corresponding split info 
+ 
   
   
   /**
@@ -224,9 +243,8 @@ public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job,
   private List<TaskCompletionEvent> mapAttemptCompletionEvents;
   private List<Integer> taskCompletionIdxToMapCompletionIdx;
   private final List<String> diagnostics = new ArrayList<String>();
-//added by wei
+  //added by wei
   private TaskDataProvision taskDataProvision;
-  
   //task/attempt related datastructures
   private final Map<TaskId, Integer> successAttemptCompletionEventNoMap = 
     new HashMap<TaskId, Integer>();
@@ -334,6 +352,9 @@ public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job,
           .addTransition(JobStateInternal.RUNNING, JobStateInternal.RUNNING, 
         	 JobEventType.JOB_TASK_ATTEMPT_CONTAINER_ASSIGNED,
         	 new TaskAttemptContainerAssignedTransition())
+          .addTransition(JobStateInternal.RUNNING, JobStateInternal.RUNNING, 
+        	  JobEventType.JOB_TASK_ATTEMPT_SPEED_UPDATE,
+        	  new TaskAttemptSpeedUpdateTransition())
           .addTransition
               (JobStateInternal.RUNNING,
               EnumSet.of(JobStateInternal.RUNNING,
@@ -752,6 +773,8 @@ public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job,
     return aclsManager.checkAccess(callerUGI, jobOperation, userName, jobACL);
   }
 
+  
+  
   @Override
   public Task getTask(TaskId taskID) {
     readLock.lock();
@@ -843,6 +866,10 @@ public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job,
     readLock.lock();
     try {
       if (mapAttemptCompletionEvents.size() > startIndex) {
+    	for(TaskCompletionEvent event:mapAttemptCompletionEvents){
+    		
+    		LOG.info("map completion event"+event.getTaskId().toString()+"status:"+event.getStatus().toString());
+    	}  
         int actualMax = Math.min(maxEvents,
             (mapAttemptCompletionEvents.size() - startIndex));
         events = mapAttemptCompletionEvents.subList(startIndex,
@@ -961,6 +988,7 @@ public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job,
       readLock.unlock();
     }
   }
+  
 
   @Override
   public JobState getState() {
@@ -987,6 +1015,7 @@ public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job,
         eventHandler.handle(new TaskRecoverEvent(taskID, taskInfo,
             committer, recoverTaskOutput));
       } else {
+    	LOG.info("schedule task"+taskID.toString());
         eventHandler.handle(new TaskEvent(taskID, TaskEventType.T_SCHEDULE));
       }
     }
@@ -1072,7 +1101,13 @@ public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job,
     }
   }
   
+  public void addAssignedMapTask(TaskId taskId){
+	  synchronized(assignedSynHandle){
+		  this.assignedMapTasks.add(taskId);		  
+	  }	  
+  }
   
+ 
   //helpful in testing
   protected void addTask(Task task) {
     synchronized (tasksSyncHandle) {
@@ -1442,6 +1477,9 @@ public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job,
         //TODO JH Verify jobACLs, UserName via UGI?
 
         TaskSplitMetaInfo[] taskSplitMetaInfo = createSplits(job, job.jobId);
+        
+        LOG.info("splits length:"+taskSplitMetaInfo.length);
+        
         job.numMapTasks = taskSplitMetaInfo.length;
         job.numReduceTasks = job.conf.getInt(MRJobConfig.NUM_REDUCES, 0);
 
@@ -1459,6 +1497,9 @@ public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job,
 
         long inputLength = 0;
         for (int i = 0; i < job.numMapTasks; ++i) {
+        	
+          LOG.info("each split length"+taskSplitMetaInfo[i].getInputDataLength());
+          
           inputLength += taskSplitMetaInfo[i].getInputDataLength();
         }
 
@@ -1478,10 +1519,21 @@ public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job,
             job.conf.getInt(MRJobConfig.REDUCE_FAILURES_MAXPERCENT, 0);
         job.taskDataProvision = new DefaultTaskDataProvision(job.jobContext);
         job.taskDataProvision.initialize(taskSplitMetaInfo);
-        // create the Tasks but don't start them yet
-        createMultiMapTasks(job,inputLength);
-        //createMapTasks(job, inputLength, taskSplitMetaInfo);
+      
+        if(job.IS_MULTIMAP){
+       
+        //create the Tasks but don't schedule them yet
+        createMultiMapTasks(job);
+       
+        //create the Tasks but don't schedule them yet
         createReduceTasks(job);
+        
+        }else{
+        	
+        createMapTasks(job, inputLength, taskSplitMetaInfo);
+        createReduceTasks(job);
+       
+        }
 
         job.metrics.endPreparingJob(job);
         return JobStateInternal.INITED;
@@ -1535,28 +1587,7 @@ public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job,
       }
     }
 
-    //for test
-    private void createMultiMapTasks(JobImpl job, long inputLength){
-    	
-    	String[] splitNodeList = job.taskDataProvision.getSplitsNodeList();
-    	
-    	for(int i=0;i<splitNodeList.length;i++){
-    		String[] split = new String[1];
-    		split[0]=splitNodeList[i];
-    		TaskImpl task =
-    	            new MapTaskImpl(job.jobId, i,
-    	                job.eventHandler, 
-    	                job.remoteJobConfFile, 
-    	                job.conf, split,
-    	                job.taskAttemptListener, 
-    	                job.jobToken, job.jobCredentials,
-    	                job.clock,
-    	                job.applicationAttemptId.getAttemptId(),
-    	                job.metrics, job.appContext);
-    	        job.addTask(task);
-    	}
-    	
-    }
+   
     private void createMapTasks(JobImpl job, long inputLength,
                                 TaskSplitMetaInfo[] splits) {
       for (int i=0; i < job.numMapTasks; ++i) {
@@ -1572,14 +1603,9 @@ public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job,
                 job.metrics, job.appContext);
         job.addTask(task);
       LOG.info("split info for task: "+i+"get split location: ");
-      for(int j=0;j<splits[j].getLocations().length;j++){
-    	  
-    	  LOG.info("node: "+splits[j].getLocations()[j]);
+      
       }
-      LOG.info("split index info for task: "+i+"get split location: "+splits[i].getSplitIndex().getSplitLocation()+"get start offset: "+splits[i].getSplitIndex().getStartOffset());
-      }
-      LOG.info("Input size for job " + job.jobId + " = " + inputLength
-          + ". Number of splits = " + splits.length);
+      
     }
 
     private void createReduceTasks(JobImpl job) {
@@ -1594,11 +1620,85 @@ public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job,
                 job.applicationAttemptId.getAttemptId(),
                 job.metrics, job.appContext);
         job.addTask(task);
+        
+        LOG.info("create reduce tasks: current reduces tasks:"+task.getID().toString());
       }
-      LOG.info("Number of reduces for job " + job.jobId + " = "
-          + job.numReduceTasks);
+     
+      
     }
 
+   private List<Integer> getRandomSet(int Max,int number){
+	  List<Integer> numberList = new ArrayList<Integer>();
+	  List<Integer> resultList = new ArrayList<Integer>();
+      for(int i=0;i<Max;i++){
+    	  numberList.add(i);
+      }
+	  if(number >= Max){
+		 return numberList;   
+	  
+	  }else{ 
+		Random random = new Random();   
+		for(int i=0;i<number;i++){
+			int rand = Math.abs(random.nextInt())%numberList.size();
+			resultList.add(numberList.get(rand));
+			numberList.remove(rand);	
+	   }
+		
+	    return resultList;	  
+	  } 
+	   
+   }
+   private String[] getRandomNode(String[] nodeList,int number){
+	 
+	if(number>=nodeList.length){
+		
+		return nodeList;
+	
+	}else{
+	   String [] result = new String[number]; 
+	   List<Integer> numberList = this.getRandomSet(nodeList.length, number);
+	   
+	   for(int i=0;i<number;i++){
+		   result[i]=nodeList[numberList.get(i)];
+	   }
+	   
+	   return result;
+	}
+   } 
+   private void createMultiMapTasks(JobImpl job){
+    	
+	    String[] splitNodeList =job.taskDataProvision.getSplitsNodeList();
+	    
+    	int BlockNum = job.taskDataProvision.getTotalBlocksNum();
+    	
+    	int partition = job.mapTasks.size();
+    	//modified by wei chen
+    	for(int i=0;i<BlockNum;i++){
+        
+    		String[] split = getRandomNode(splitNodeList,3);
+    		for(String s : split){
+    			LOG.info("apply on node:"+s);
+    		}
+    		TaskImpl task =
+    	            new MultiMapTaskImpl(job.jobId, partition,
+    	                job.eventHandler, 
+    	                job.remoteJobConfFile, 
+    	                job.conf, split,
+    	                job.taskAttemptListener, 
+    	                job.jobToken, job.jobCredentials,
+    	                job.clock,
+    	                job.applicationAttemptId.getAttemptId(),
+    	                job.metrics, job.appContext);
+    	        
+    		    job.addTask(task);    	        
+    	        partition++;	 
+    	}
+    	
+    	job.numMapTasks = job.mapTasks.size();                  //update the number of map tasks 
+    	    	
+    	
+    	
+    }
     protected TaskSplitMetaInfo[] createSplits(JobImpl job, JobId jobId) {
       TaskSplitMetaInfo[] allTaskSplitMetaInfo;
       try {
@@ -1635,16 +1735,39 @@ public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job,
       implements SingleArcTransition<JobImpl, JobEvent> {
     @Override
     public void transition(JobImpl job, JobEvent event) {
+      
       job.setupProgress = 1.0f;
+    
       job.scheduleTasks(job.mapTasks, job.numReduceTasks == 0);
       job.scheduleTasks(job.reduceTasks, true);
-
+      
       // If we have no tasks, just transition to job completed
       if (job.numReduceTasks == 0 && job.numMapTasks == 0) {
         job.eventHandler.handle(new JobEvent(job.jobId,
             JobEventType.JOB_COMPLETED));
       }
     }
+  }
+  
+  
+  private static class TaskAttemptSpeedUpdateTransition
+      implements SingleArcTransition<JobImpl, JobEvent> {
+
+	@Override
+	public void transition(JobImpl job, JobEvent event) {
+		// TODO Auto-generated method stub
+		JobTaskAttemptSpeedUpdateEvent jsu = (JobTaskAttemptSpeedUpdateEvent)event;
+		
+		job.taskDataProvision.updateNodeSpeed(jsu.getHost(), (long)jsu.getSpeed(),0,false);
+		//get newest node speed sorted list
+	    List<String> hostList = job.taskDataProvision.getSortedNodeList();
+		//inform the containerAllocator about current node speed
+		job.eventHandler.handle(new ContainerNodeSpeedUpdateEvent(hostList,ContainerAllocator.EventType.CONTAINER_NODE_SPEED));
+		
+		LOG.info("get hsot speed update: "+ jsu.getHost()+"speed:  "+jsu.getSpeed());
+							
+	}
+	 	  
   }
 
   private static class SetupFailedTransition
@@ -1751,6 +1874,9 @@ public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job,
         job.jobContext, org.apache.hadoop.mapreduce.JobStatus.State.FAILED));
     }
   }
+  
+  
+  
 
   // JobFinishedEvent triggers the move of the history file out of the staging
   // area. May need to create a new event type for this if JobFinished should 
@@ -1870,20 +1996,49 @@ public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job,
      TaskAttemptId taskAttemptId = jca.getTaskAttemptID();
      TaskId taskId = taskAttemptId.getTaskId();
           
-     LOG.info("task id for container assigned: "+taskId.getId());
-     
-     TaskSplitMetaInfo[] splitMetaInfo=job.taskDataProvision.getAllSplitOnNode(host);
-    
      Task task = job.tasks.get(taskId);
      TaskAttempt attempt = task.getAttempt(taskAttemptId);
+        
+     LOG.info("attempt"+taskAttemptId.toString()+"on node:"+host);
      
      if(attempt instanceof MultiMapTaskAttemptImpl){
     	 
-    	 LOG.info("attempt"+taskAttemptId.getId()+"set splitInfo length: "+splitMetaInfo.length);
+    	 Set<TaskSplitMetaInfo> splitMetaInfo;
     	 
-    	 ((MultiMapTaskAttemptImpl) attempt).setSplitInfos(splitMetaInfo);
+    	 if(job.taskDataProvision.getSplitsForTask(taskId.toString())==null){                    //first try
+    	    splitMetaInfo=job.taskDataProvision.getAutomatedSplitOnNode(host, false); 
+    	        if(splitMetaInfo.size() == 0){
+    	           for(TaskId killedTaskId: job.mapTasks){
+    	        	   if(job.assignedMapTasks.contains(killedTaskId) &&(job.tasks.get(killedTaskId) instanceof MultiMapTaskImpl)){    	        		   
+    	        		   continue;
+    	        	   }else{ 
+    	        		   LOG.info("no data kill task"+killedTaskId);
+    	        		   job.eventHandler.handle(
+    	        		              new TaskEvent(killedTaskId, TaskEventType.T_KILL));   //kill all the rest classes which are not assigend task
+    	        	   }
+    	           }	
+    	        
+    	        	return;
+    	    }else{
+    	    	job.addAssignedMapTask(taskId);                     //sync required    	    	
+    	    }
+            
+    	     job.taskDataProvision.regiserForTask(taskId.toString(), splitMetaInfo);       //sync reruired	      	     	 
+    	  
+             LOG.info("assigned data length: "+job.taskDataProvision.getAssignedDataSize());
+
+    	 ((MultiMapTaskAttemptImpl) attempt).setSplitInfos(splitMetaInfo.toArray(new TaskSplitMetaInfo[splitMetaInfo.size()]));
      
-     }
+         }else{                                                          //it's a speculative task
+        	 
+             splitMetaInfo = job.taskDataProvision.getSplitsForTask(taskId.toString());
+          
+             ((MultiMapTaskAttemptImpl) attempt).setSplitInfos(splitMetaInfo.toArray(new TaskSplitMetaInfo[splitMetaInfo.size()]));
+              LOG.info("attempt"+taskAttemptId.toString()+"splitInfo length: "+splitMetaInfo.size());
+       
+         }
+         
+        }
         
     }
   }
@@ -1900,11 +2055,14 @@ public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job,
       tce.setEventId(job.taskAttemptCompletionEvents.size());
       job.taskAttemptCompletionEvents.add(tce);
       int mapEventIdx = -1;
+      
+     
       if (TaskType.MAP.equals(tce.getAttemptId().getTaskId().getTaskType())) {
         // we track map completions separately from task completions because
         // - getMapAttemptCompletionEvents uses index ranges specific to maps
-        // - type converting the same events over and over is expensive
-        mapEventIdx = job.mapAttemptCompletionEvents.size();
+        // - type converting the same ev+ents over and over is expensive
+    	LOG.info("add map completion event"+tce.getAttemptId().getTaskId().toString()+"event output Addr:"+tce.getMapOutputServerAddress());
+        mapEventIdx = job.mapAttemptCompletionEvents.size();   
         job.mapAttemptCompletionEvents.add(TypeConverter.fromYarn(tce));
       }
       job.taskCompletionIdxToMapCompletionIdx.add(mapEventIdx);
@@ -2007,7 +2165,13 @@ public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job,
       JobTaskEvent taskEvent = (JobTaskEvent) event;
       Task task = job.tasks.get(taskEvent.getTaskID());
       if (taskEvent.getState() == TaskState.SUCCEEDED) {
-        taskSucceeded(job, task);
+  		TaskAttempt taskAttempt = task.getAttempts().get(taskEvent.getAttemptId());
+    	job.taskDataProvision.updateNodeSpeed(taskAttempt.getNodeId().getHost(),taskEvent.getTaskExecutionTime(),taskEvent.getTaskExecutionRatio(),true);	  
+    	//get newest node speed sorted list
+	    List<String> hostList = job.taskDataProvision.getSortedNodeList();
+		//inform the containerAllocator about current node speed
+		job.eventHandler.handle(new ContainerNodeSpeedUpdateEvent(hostList,ContainerAllocator.EventType.CONTAINER_NODE_SPEED));
+    	taskSucceeded(job, task);
       } else if (taskEvent.getState() == TaskState.FAILED) {
         taskFailed(job, task);
       } else if (taskEvent.getState() == TaskState.KILLED) {
@@ -2079,8 +2243,27 @@ public class JobImpl implements org.apache.hadoop.mapreduce.v2.app.job.Job,
       return job.checkReadyForCommit();
     }
 
+    
+
+    private void createMultiReduceTasks(JobImpl job) {
+      for (int i = 0; i < job.numReduceTasks; i++) {
+        TaskImpl task =
+            new ReduceTaskImpl(job.jobId, i,
+                job.eventHandler, 
+                job.remoteJobConfFile, 
+                job.conf, job.numMapTasks, 
+                job.taskAttemptListener, job.jobToken,
+                job.jobCredentials, job.clock,
+                job.applicationAttemptId.getAttemptId(),
+                job.metrics, job.appContext);
+        job.addTask(task);
+      }
+      LOG.info("create multi reduces Number of reduces for job " + job.jobId + " = "
+          + job.numReduceTasks);
+    }
+ 
     private void taskSucceeded(JobImpl job, Task task) {
-      if (task.getType() == TaskType.MAP) {
+      if (task.getType() == TaskType.MAP) {	  
         job.succeededMapTaskCount++;
       } else {
         job.succeededReduceTaskCount++;

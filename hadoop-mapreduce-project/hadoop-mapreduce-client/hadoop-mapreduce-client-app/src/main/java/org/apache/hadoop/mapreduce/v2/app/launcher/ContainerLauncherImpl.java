@@ -141,6 +141,8 @@ public class ContainerLauncherImpl extends AbstractService implements
         ContainerLaunchContext containerLaunchContext =
           event.getContainerLaunchContext();
 
+        LOG.info("launch remote task on"+this.containerMgrAddress+"from"+this.taskAttemptID.toString());
+        
         // Now launch the actual container
         StartContainerRequest startRequest =
             StartContainerRequest.newInstance(containerLaunchContext,
@@ -150,6 +152,7 @@ public class ContainerLauncherImpl extends AbstractService implements
         StartContainersRequest requestList = StartContainersRequest.newInstance(list);
         StartContainersResponse response =
             proxy.getContainerManagementProtocol().startContainers(requestList);
+        
         if (response.getFailedRequests() != null
             && response.getFailedRequests().containsKey(containerID)) {
           throw response.getFailedRequests().get(containerID).deSerialize();
@@ -191,6 +194,7 @@ public class ContainerLauncherImpl extends AbstractService implements
     public synchronized void kill() {
 
       if(this.state == ContainerState.PREP) {
+    	LOG.info("final state for killed container"+"KILLED BEFORE LAUNCH");
         this.state = ContainerState.KILLED_BEFORE_LAUNCH;
       } else if (!isCompletelyDone()) {
         LOG.info("KILLING " + taskAttemptID);
@@ -225,6 +229,7 @@ public class ContainerLauncherImpl extends AbstractService implements
             cmProxy.mayBeCloseProxy(proxy);
           }
         }
+        LOG.info("final state for killed container"+"DONE");
         this.state = ContainerState.DONE;
       }
       // after killing, send killed event to task attempt

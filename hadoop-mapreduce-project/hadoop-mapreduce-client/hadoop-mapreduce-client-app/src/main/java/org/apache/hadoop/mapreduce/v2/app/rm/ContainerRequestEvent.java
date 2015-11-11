@@ -27,20 +27,32 @@ public class ContainerRequestEvent extends ContainerAllocatorEvent {
   private final Resource capability;
   private final String[] hosts;
   private final String[] racks;
+  private final boolean  nodeRelaxLocality;
+  private final boolean  rackRelaxLocality;
+  private final boolean  anyRelaxLocality;
   private boolean earlierAttemptFailed = false;
 
   public ContainerRequestEvent(TaskAttemptId attemptID, 
-      Resource capability,
+      Resource capability,boolean nodeRelaxLocality,boolean rackRelaxLocality,boolean anyRelaxLocality,
       String[] hosts, String[] racks) {
     super(attemptID, ContainerAllocator.EventType.CONTAINER_REQ);
     this.capability = capability;
     this.hosts = hosts;
     this.racks = racks;
+    this.nodeRelaxLocality = nodeRelaxLocality;
+    this.rackRelaxLocality = rackRelaxLocality;
+    this.anyRelaxLocality  = anyRelaxLocality;
   }
   
-  ContainerRequestEvent(TaskAttemptId attemptID, Resource capability) {
-    this(attemptID, capability, new String[0], new String[0]);
+  public ContainerRequestEvent(TaskAttemptId attemptID, Resource capability){ 
+    super(attemptID, ContainerAllocator.EventType.CONTAINER_REQ);
+    this.capability = capability;
+    this.hosts = new String[0];
+    this.racks = new String[0];
     this.earlierAttemptFailed = true;
+    this.nodeRelaxLocality = true;
+    this.rackRelaxLocality = true;
+    this.anyRelaxLocality  = true;
   }
   
   public static ContainerRequestEvent createContainerRequestEventForFailedContainer(
@@ -50,6 +62,7 @@ public class ContainerRequestEvent extends ContainerAllocatorEvent {
     return new ContainerRequestEvent(attemptID, capability);
   }
 
+  
   public Resource getCapability() {
     return capability;
   }
@@ -65,4 +78,22 @@ public class ContainerRequestEvent extends ContainerAllocatorEvent {
   public boolean getEarlierAttemptFailed() {
     return earlierAttemptFailed;
   }
+  
+  public boolean isNodeRelaxLocality() {
+		return nodeRelaxLocality;
+   }
+
+  public boolean isRackRelaxLocality() {
+		return rackRelaxLocality;
+   }
+
+	
+  public boolean isAnyRelaxLocality() {
+		
+	   return anyRelaxLocality;
+	
+  }
+
+  
+  
 }

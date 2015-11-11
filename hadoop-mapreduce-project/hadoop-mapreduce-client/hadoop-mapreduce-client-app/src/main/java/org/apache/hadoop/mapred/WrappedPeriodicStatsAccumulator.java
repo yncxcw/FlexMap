@@ -44,17 +44,17 @@ public class WrappedPeriodicStatsAccumulator {
 	  
 	  if(real!=null){
 		  
-		  LOG.info("real is not null and size of real is"+real.toDouble().length);
+		 // LOG.info("real is not null and size of real is"+real.toDouble().length);
 		  return real.toDouble();
 	  }
 	  
 	  if(timeReal!=null){
 		  
-		  LOG.info("timereal is not null and size of real is"+timeReal.toDouble().length);
+		//  LOG.info("timereal is not null and size of real is"+timeReal.toDouble().length);
 		  return timeReal.toDouble();
 	  }
 	  
-	  LOG.info("timereal is null and real is also null");
+	//  LOG.info("timereal is null and real is also null");
 	  
 	  return null;
   }

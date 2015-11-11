@@ -152,6 +152,7 @@ public class MultiMapTask extends MapTask {
 	              mapContext);
 
 	    try {
+	      taskStatus.setMapBeginTime(System.currentTimeMillis());
 	      input.initialize();
 	      mapper.run(mapperContext);
 	      mapPhase.complete();

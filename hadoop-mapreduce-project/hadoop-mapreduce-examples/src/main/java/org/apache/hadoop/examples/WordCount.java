@@ -18,6 +18,9 @@
 package org.apache.hadoop.examples;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
 import java.util.StringTokenizer;
 
 import org.apache.hadoop.conf.Configuration;
@@ -52,7 +55,7 @@ public class WordCount {
   public static class IntSumReducer 
        extends Reducer<Text,IntWritable,Text,IntWritable> {
     private IntWritable result = new IntWritable();
-
+    @Override
     public void reduce(Text key, Iterable<IntWritable> values, 
                        Context context
                        ) throws IOException, InterruptedException {
@@ -65,25 +68,49 @@ public class WordCount {
     }
   }
 
+  static void printUsage(){
+	  System.out.println("Usage: wordcount [-r <reduces>]<in> [<in>...] <out>");
+  }
   public static void main(String[] args) throws Exception {
     Configuration conf = new Configuration();
-    String[] otherArgs = new GenericOptionsParser(conf, args).getRemainingArgs();
-    if (otherArgs.length < 2) {
-      System.err.println("Usage: wordcount <in> [<in>...] <out>");
-      System.exit(2);
-    }
-    Job job = new Job(conf, "word count");
+   
+    Job job = Job.getInstance(conf, "word count");
     job.setJarByClass(WordCount.class);
     job.setMapperClass(TokenizerMapper.class);
     job.setCombinerClass(IntSumReducer.class);
     job.setReducerClass(IntSumReducer.class);
     job.setOutputKeyClass(Text.class);
     job.setOutputValueClass(IntWritable.class);
-    for (int i = 0; i < otherArgs.length - 1; ++i) {
-      FileInputFormat.addInputPath(job, new Path(otherArgs[i]));
-    }
-    FileOutputFormat.setOutputPath(job,
-      new Path(otherArgs[otherArgs.length - 1]));
-    System.exit(job.waitForCompletion(true) ? 0 : 1);
+    List<String> other_args = new ArrayList<String>();
+    for(int i=0; i < args.length; ++i) {
+        try {
+          if ("-r".equals(args[i])) {
+            job.setNumReduceTasks(Integer.parseInt(args[++i]));
+          } else {
+            other_args.add(args[i]);
+          }
+        } catch (NumberFormatException except) {
+          System.out.println("ERROR: Integer expected instead of " + args[i]);
+          printUsage();
+        } catch (ArrayIndexOutOfBoundsException except) {
+          System.out.println("ERROR: Required parameter missing from " +
+              args[i-1]);
+          printUsage(); // exits
+        }
+      }
+    FileInputFormat.addInputPath(job, new Path(other_args.get(0)));
+    String outPath = new String(other_args.get(1));
+    FileOutputFormat.setOutputPath(job, new Path(outPath));
+    Date startTime = new Date();
+    System.out.println("Job started: " + startTime);
+
+    Boolean waitforCompletion = job.waitForCompletion(true) ;
+
+    Date end_time = new Date();
+    System.out.println("Job ended: " + end_time);
+    System.out.println("The job took " +
+        (end_time.getTime() - startTime.getTime()) /1000 + " seconds.");
+    System.exit(waitforCompletion ? 0 : 1);
+	return;
   }
 }

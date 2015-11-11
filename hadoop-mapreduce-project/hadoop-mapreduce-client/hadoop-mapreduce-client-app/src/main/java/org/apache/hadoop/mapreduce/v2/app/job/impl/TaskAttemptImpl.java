@@ -48,6 +48,8 @@ import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.JobContext;
 import org.apache.hadoop.mapred.MapReduceChildJVM;
+import org.apache.hadoop.mapred.MapTaskAttemptImpl;
+import org.apache.hadoop.mapred.MultiMapTaskAttemptImpl;
 import org.apache.hadoop.mapred.ShuffleHandler;
 import org.apache.hadoop.mapred.Task;
 import org.apache.hadoop.mapred.TaskAttemptContextImpl;
@@ -86,6 +88,7 @@ import org.apache.hadoop.mapreduce.v2.app.job.event.JobDiagnosticsUpdateEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.JobEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.JobEventType;
 import org.apache.hadoop.mapreduce.v2.app.job.event.JobTaskAttemptFetchFailureEvent;
+import org.apache.hadoop.mapreduce.v2.app.job.event.JobTaskAttemptSpeedUpdateEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptContainerAssignedEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptContainerLaunchedEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptDiagnosticsUpdateEvent;
@@ -94,6 +97,7 @@ import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptEventType;
 import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptKillEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptRecoverEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptStatusUpdateEvent;
+import org.apache.hadoop.mapreduce.v2.app.job.event.TaskEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptStatusUpdateEvent.TaskAttemptStatus;
 import org.apache.hadoop.mapreduce.v2.app.job.event.TaskEventType;
 import org.apache.hadoop.mapreduce.v2.app.job.event.TaskTAttemptEvent;
@@ -177,6 +181,8 @@ public abstract class TaskAttemptImpl implements
   private static final Object classpathLock = new Object();
   private long launchTime;
   private long finishTime;
+  private long begingExecutionTime;
+  private long endExecutionTime;
   private WrappedProgressSplitsBlock progressSplitBlock;
   private int shufflePort = -1;
   private String trackerName;
@@ -519,6 +525,8 @@ public abstract class TaskAttemptImpl implements
     this.clock = clock;
     attemptId = recordFactory.newRecordInstance(TaskAttemptId.class);
     attemptId.setTaskId(taskId);
+    
+  
     attemptId.setId(i);
     this.taskAttemptListener = taskAttemptListener;
     this.appContext = appContext;
@@ -873,7 +881,33 @@ public abstract class TaskAttemptImpl implements
       readLock.unlock();
     }
   }
-
+  
+  @Override
+  public long getBeginExecutionTime(){
+	 readLock.lock();
+	 try{
+		 
+		 return begingExecutionTime;
+	 }finally{
+		 
+		 readLock.unlock();
+	 }	  
+  }
+  
+  @Override
+  public long getEndExecutionTime(){
+	 readLock.lock();
+	 
+	 try{
+		 
+		 return endExecutionTime;
+	 
+	 }finally{
+		 
+	     readLock.unlock();   	 
+	 }
+	  
+  }
   @Override
   public long getFinishTime() {
     readLock.lock();
@@ -1251,6 +1285,26 @@ public abstract class TaskAttemptImpl implements
       finishTime = clock.getTime();
     }
   }
+  
+ 
+  private void setBeginExecutionTime(long time){
+	  
+	  if(this.begingExecutionTime == 0){
+		  
+		  this.begingExecutionTime = time;
+	  }
+	  
+  }
+  
+  private void setEndExecutionTime(long time){
+	  
+	  if(this.endExecutionTime == 0 && this.begingExecutionTime !=0){
+		  
+		  this.endExecutionTime = time;
+	  }
+	  
+  }
+  
 
   private void computeRackAndLocality() {
     NodeId containerNodeId = container.getNodeId();
@@ -1399,14 +1453,39 @@ public abstract class TaskAttemptImpl implements
     }
   }
   
-  private void updateProgressSplits() {
-    double newProgress = reportedStatus.progress;
+  @SuppressWarnings("unchecked")
+private void updateProgressSplits() {
+    double newProgress  = reportedStatus.progress;
+    double currentSpeed = 0;
     newProgress = Math.max(Math.min(newProgress, 1.0D), 0.0D);
     Counters counters = reportedStatus.counters;
+    
     if (counters == null)
-      return;
+             return;
 
     WrappedProgressSplitsBlock splitsBlock = getProgressSplitBlock();
+    
+    if(reportedStatus.mapBeginTime!=0){
+    	
+    	setBeginExecutionTime(reportedStatus.mapBeginTime);
+    }
+    
+    if(reportedStatus.mapFinishTime!=0){
+    	
+        setEndExecutionTime(reportedStatus.mapFinishTime);
+    }
+    
+    if(this.getBeginExecutionTime()>0 && reportedStatus.currentTime > this.getBeginExecutionTime()){
+    	
+    	long hdfsRecordRead = counters.findCounter(TaskCounter.MAP_INPUT_RECORDS).getValue();   	
+    	currentSpeed = 1.0 * hdfsRecordRead / (reportedStatus.currentTime-this.getBeginExecutionTime());
+    	eventHandler.handle(new JobTaskAttemptSpeedUpdateEvent(
+                attemptId, currentSpeed,this.getNodeId().getHost())); 
+    
+    }
+    
+    
+    
     if (splitsBlock != null) {
       long now = clock.getTime();
       long start = getLaunchTime(); // TODO Ensure not 0
@@ -1491,8 +1570,10 @@ public abstract class TaskAttemptImpl implements
                 taskAttempt.attemptId, 
                 taskAttempt.resourceCapability));
       } else {
+    	
+     
         taskAttempt.eventHandler.handle(new ContainerRequestEvent(
-            taskAttempt.attemptId, taskAttempt.resourceCapability,
+            taskAttempt.attemptId, taskAttempt.resourceCapability,true,true,true,
             taskAttempt.dataLocalHosts.toArray(
                 new String[taskAttempt.dataLocalHosts.size()]),
             taskAttempt.dataLocalRacks.toArray(
@@ -1547,6 +1628,21 @@ public abstract class TaskAttemptImpl implements
       Container container = cEvent.getContainer();
       taskAttempt.container = container;
       // this is a _real_ Task (classic Hadoop mapred flavor):
+      
+      if(taskAttempt instanceof MultiMapTaskAttemptImpl){
+    	  
+    	  if(((MultiMapTaskAttemptImpl) taskAttempt).getTaskSplitMetaInfo()==null){   // we do nothing here if we find splitinfo is null
+    		
+    		  LOG.info("quit container from"+taskAttempt.getID().toString());
+    		  
+    		  taskAttempt.eventHandler.handle(
+	                    new TaskEvent(taskAttempt.getID().getTaskId(), TaskEventType.T_KILL));
+    		  
+    		  return;
+    	  }
+      }
+      
+      LOG.info("container assigned for attempt"+taskAttempt.getID().toString());
       
       taskAttempt.remoteTask = taskAttempt.createRemoteTask();
       
@@ -1673,6 +1769,8 @@ public abstract class TaskAttemptImpl implements
       //and free up the memory
       taskAttempt.remoteTask = null;
       
+      LOG.info("recieve task launched info from:"+taskAttempt.getID().toString());
+      
       //tell the Task that attempt has started
       taskAttempt.eventHandler.handle(new TaskTAttemptEvent(
           taskAttempt.attemptId, 
@@ -1774,15 +1872,7 @@ public abstract class TaskAttemptImpl implements
     int containerNodePort =
         this.container == null ? -1 : this.container.getNodeId().getPort();
     if (attemptId.getTaskId().getTaskType() == TaskType.MAP) {
-    	
-     //added by wei for test
-     double[] testHDFSreadSpeed=this.getProgressSplitBlock().getProgressSpeedHdfsRead().getValue();  
-     
-     for(int i=0;i<testHDFSreadSpeed.length;i++){
-    	 
-    	 LOG.info("HDFSSpeed: index "+i+"value "+testHDFSreadSpeed[i]);
-     }
-     
+    	   
       MapAttemptFinishedEvent mfe =
          new MapAttemptFinishedEvent(TypeConverter.fromYarn(attemptId),
          TypeConverter.fromYarn(attemptId.getTaskId().getTaskType()),
@@ -1795,13 +1885,6 @@ public abstract class TaskAttemptImpl implements
          this.reportedStatus.stateString,
          getCounters(),
          getProgressSplitBlock().burst());
-      //added by wei for test
-         for(int i=0;i<getProgressSplitBlock().burst().length;i++){
-        	 LOG.info("line"+i);
-             for(int j=0;j<getProgressSplitBlock().burst()[i].length;j++)	 
-         	    LOG.info("data:"+i+" "+j+" "+getProgressSplitBlock().burst()[i][j]);        	 
-         }
-         
          eventHandler.handle(
            new JobHistoryEvent(attemptId.getTaskId().getJobId(), mfe));
     } else {
@@ -1935,9 +2018,12 @@ public abstract class TaskAttemptImpl implements
         TaskAttemptEvent event) {
       // unregister it to TaskAttemptListener so that it stops listening
       // for it
-      taskAttempt.taskAttemptListener.unregister(
+      if(taskAttempt.jvmID!=null){	
+      
+       taskAttempt.taskAttemptListener.unregister(
           taskAttempt.attemptId, taskAttempt.jvmID);
 
+      }
       if (event instanceof TaskAttemptKillEvent) {
         taskAttempt.addDiagnosticInfo(
             ((TaskAttemptKillEvent) event).getMessage());
@@ -1972,7 +2058,7 @@ public abstract class TaskAttemptImpl implements
           ((TaskAttemptStatusUpdateEvent) event)
               .getReportedTaskAttemptStatus();
       // Now switch the information in the reportedStatus
-      taskAttempt.reportedStatus = newReportedStatus;
+      taskAttempt.reportedStatus = newReportedStatus;    
       taskAttempt.reportedStatus.taskState = taskAttempt.getState();
 
       // send event to speculator about the reported status

@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.mapreduce.v2.app.job.event;
 
+import org.apache.hadoop.mapreduce.v2.api.records.TaskAttemptId;
 import org.apache.hadoop.mapreduce.v2.api.records.TaskId;
 import org.apache.hadoop.mapreduce.v2.api.records.TaskState;
 
@@ -26,13 +27,27 @@ public class JobTaskEvent extends JobEvent {
 
   private TaskId taskID;
   private TaskState taskState;
+  private TaskAttemptId attemptId;
+  private long taskExecutionTime;
+  private double taskExecutionRatio;
 
   public JobTaskEvent(TaskId taskID, TaskState taskState) {
     super(taskID.getJobId(), JobEventType.JOB_TASK_COMPLETED);
     this.taskID = taskID;
     this.taskState = taskState;
+    
   }
 
+  public TaskAttemptId getAttemptId(){
+	  
+	  return attemptId;
+  }
+  
+  public void setAttemptId(TaskAttemptId attemptId){
+	  
+	  this.attemptId = attemptId;
+  }
+  
   public TaskId getTaskID() {
     return taskID;
   }
@@ -40,4 +55,25 @@ public class JobTaskEvent extends JobEvent {
   public TaskState getState() {
     return taskState;
   }
+
+public long getTaskExecutionTime() {
+	return taskExecutionTime;
+}
+
+public void setTaskExecutionTime(long taskExcutionTime){
+	
+	this.taskExecutionTime = taskExcutionTime;
+}
+
+public double getTaskExecutionRatio(){
+	
+	return this.taskExecutionRatio;
+}
+
+public void setTaskExecutionRatio(double taskExecutionRatio){
+	
+	this.taskExecutionRatio = taskExecutionRatio;
+
+}
+
 }

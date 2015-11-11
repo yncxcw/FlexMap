@@ -23,6 +23,8 @@ import java.io.IOException;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.mapreduce.task.annotation.Checkpointable;
 
 import java.util.Iterator;
@@ -122,6 +124,9 @@ import java.util.Iterator;
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public class Reducer<KEYIN,VALUEIN,KEYOUT,VALUEOUT> {
+	
+
+   public static final Log LOG = LogFactory.getLog("org.apache.hadoop.mapreduce.reducer");	 
 
   /**
    * The <code>Context</code> passed on to the {@link Reducer} implementations.
@@ -146,6 +151,7 @@ public class Reducer<KEYIN,VALUEIN,KEYOUT,VALUEOUT> {
   @SuppressWarnings("unchecked")
   protected void reduce(KEYIN key, Iterable<VALUEIN> values, Context context
                         ) throws IOException, InterruptedException {
+	LOG.info("execute default function");  
     for(VALUEIN value: values) {
       context.write((KEYOUT) key, (VALUEOUT) value);
     }

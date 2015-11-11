@@ -26,6 +26,7 @@ import java.io.IOException;
 class MapTaskStatus extends TaskStatus {
 
   private long mapFinishTime = 0;
+  private long mapBeginTime=0;
   
   public MapTaskStatus() {}
 
@@ -65,6 +66,18 @@ class MapTaskStatus extends TaskStatus {
   }
 
   @Override
+  public long getMapBeginTime(){
+	  
+	  return mapBeginTime;
+  }
+  
+  @Override
+  public void setMapBeginTime(long mapBeginTime){
+	  
+	  this.mapBeginTime = mapBeginTime;
+  }
+  
+  @Override
   public long getMapFinishTime() {
     return mapFinishTime;
   }
@@ -81,18 +94,25 @@ class MapTaskStatus extends TaskStatus {
     if (status.getMapFinishTime() != 0) {
       this.mapFinishTime = status.getMapFinishTime();
     }
+    
+    if(status.getMapBeginTime() !=0) {
+    	
+       this.mapBeginTime = status.getMapBeginTime();	
+    }
   }
   
   @Override
   public void readFields(DataInput in) throws IOException {
     super.readFields(in);
     mapFinishTime = in.readLong();
+    mapBeginTime = in.readLong();
   }
   
   @Override
   public void write(DataOutput out) throws IOException {
     super.write(out);
     out.writeLong(mapFinishTime);
+    out.writeLong(mapBeginTime);
   }
 
   @Override

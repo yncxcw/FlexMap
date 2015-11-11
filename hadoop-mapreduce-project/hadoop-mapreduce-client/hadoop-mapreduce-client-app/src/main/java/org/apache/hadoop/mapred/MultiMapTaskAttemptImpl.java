@@ -2,6 +2,7 @@ package org.apache.hadoop.mapred;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.MRJobConfig;
+import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.TypeConverter;
 import org.apache.hadoop.mapreduce.security.token.JobTokenIdentifier;
 import org.apache.hadoop.mapreduce.split.JobSplit.TaskSplitIndex;
@@ -10,6 +11,7 @@ import org.apache.hadoop.mapreduce.split.JobSplit.SplitMetaInfo;
 import org.apache.hadoop.mapreduce.v2.api.records.TaskId;
 import org.apache.hadoop.mapreduce.v2.app.AppContext;
 import org.apache.hadoop.mapreduce.v2.app.TaskAttemptListener;
+import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptContainerAssignedEvent;
 import org.apache.hadoop.mapreduce.v2.app.job.impl.TaskAttemptImpl;
 import org.apache.hadoop.mapreduce.v2.app.rm.RMContainerAllocator;
 import org.apache.hadoop.security.Credentials;
@@ -46,6 +48,12 @@ public class MultiMapTaskAttemptImpl extends TaskAttemptImpl {
 		
 		this.splitInfos=splitInfos;
 	}
+	
+	public TaskSplitMetaInfo[] getTaskSplitMetaInfo(){
+		
+		return this.splitInfos;
+		
+	}
 
 	@Override
 	protected Task createRemoteTask() {
@@ -62,8 +70,7 @@ public class MultiMapTaskAttemptImpl extends TaskAttemptImpl {
 				  //new MultiMapTask();
 			    mapTask.setUser(conf.get(MRJobConfig.USER_NAME));
 			    mapTask.setConf(conf);
-			    
-	    //mapTask.setTaskType(TaskType.MULTIMAP);
+			    mapTask.setTaskType(TaskType.MULTI_MAP);
 			    
     return mapTask;
 

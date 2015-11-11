@@ -43,7 +43,7 @@ public abstract class TaskAttemptId implements Comparable<TaskAttemptId> {
   public abstract int getId();
 
   public abstract void setTaskId(TaskId taskId);
-
+  
   public abstract void setId(int id);
 
   protected static final String TASKATTEMPT = "attempt";

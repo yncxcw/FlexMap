@@ -397,8 +397,22 @@ public abstract class FileInputFormat<K, V> extends InputFormat<K, V> {
         if (isSplitable(job, path)) {
           long blockSize = file.getBlockSize();
           long splitSize = computeSplitSize(blockSize, minSize, maxSize);
-
           long bytesRemaining = length;
+          
+          for(int i=0;i<blkLocations.length;i++){
+
+        	  splitSize = blkLocations[i].getLength();
+
+        	  splits.add(makeSplit(path,length-bytesRemaining,splitSize,blkLocations[i].getHosts(),
+        	  blkLocations[i].getCachedHosts()));
+
+        	  bytesRemaining -= splitSize;
+
+        	  LOG.info("block info : " +i+" block offset:"+blkLocations[i].getOffset()+"block length:"+blkLocations[i].getLength()+" block locations:"+blkLocations[i].getHosts().toString()); 
+          }
+
+         /* 
+          
           while (((double) bytesRemaining)/splitSize > SPLIT_SLOP) {
             int blkIndex = getBlockIndex(blkLocations, length-bytesRemaining);
             splits.add(makeSplit(path, length-bytesRemaining, splitSize,
@@ -413,6 +427,8 @@ public abstract class FileInputFormat<K, V> extends InputFormat<K, V> {
                        blkLocations[blkIndex].getHosts(),
                        blkLocations[blkIndex].getCachedHosts()));
           }
+          
+        */
         } else { // not splitable
           splits.add(makeSplit(path, 0, length, blkLocations[0].getHosts(),
                       blkLocations[0].getCachedHosts()));

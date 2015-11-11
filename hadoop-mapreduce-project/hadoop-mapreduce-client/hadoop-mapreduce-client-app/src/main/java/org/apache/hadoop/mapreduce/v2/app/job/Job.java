@@ -63,6 +63,7 @@ public interface Job {
   int getTotalMaps();
   int getTotalReduces();
   int getCompletedMaps();
+  
   int getCompletedReduces();
   float getProgress();
   boolean isUber();

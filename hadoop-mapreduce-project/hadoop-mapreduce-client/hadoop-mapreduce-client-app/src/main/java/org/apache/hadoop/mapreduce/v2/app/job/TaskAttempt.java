@@ -72,6 +72,19 @@ public interface TaskAttempt {
    */
   String getNodeRackName();
 
+  /**
+   * @return time at which the task is truely executed. if the container is no launched
+   * @return 0
+   */
+  
+  public long getBeginExecutionTime();
+  
+  /**
+   * @return time at which the task ends execution, 
+   * exclude the time of which rpc interval and container reallocation
+   */
+  
+  public long getEndExecutionTime();
   /** 
    * @return time at which container is launched. If container is not launched
    * yet, returns 0.

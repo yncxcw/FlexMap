@@ -39,6 +39,7 @@ import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapreduce.Counters;
 import org.apache.hadoop.mapreduce.MRConfig;
 import org.apache.hadoop.mapreduce.OutputCommitter;
+import org.apache.hadoop.mapreduce.TaskCounter;
 import org.apache.hadoop.mapreduce.TypeConverter;
 import org.apache.hadoop.mapreduce.jobhistory.JobHistoryEvent;
 import org.apache.hadoop.mapreduce.jobhistory.JobHistoryParser.TaskAttemptInfo;
@@ -496,9 +497,9 @@ public abstract class TaskImpl implements Task, EventHandler<TaskEvent> {
   //this is always called in read/write lock
   //TODO Verify behaviour is Task is killed (no finished attempt)
   private long getFinishTime() {
-    if (!isFinished()) {
-      return 0;
-    }
+    //if (!isFinished()) {
+    //  return 0;
+    // }
     long finishTime = 0;
     for (TaskAttempt at : attempts.values()) {
       //select the max finish time of all attempts
@@ -676,14 +677,20 @@ public abstract class TaskImpl implements Task, EventHandler<TaskEvent> {
     TaskAttempt attempt = attempts.get(attemptId);
     //raise the completion event only if the container is assigned
     // to nextAttemptNumber
-    if (attempt.getNodeHttpAddress() != null) {
+    //if (attempt.getNodeHttpAddress() != null) 
+    {
       TaskAttemptCompletionEvent tce = recordFactory
           .newRecordInstance(TaskAttemptCompletionEvent.class);
       tce.setEventId(-1);
       String scheme = (encryptedShuffle) ? "https://" : "http://";
-      tce.setMapOutputServerAddress(StringInterner.weakIntern(scheme
+      if(attempt.getNodeHttpAddress()!=null){
+       tce.setMapOutputServerAddress(StringInterner.weakIntern(scheme
          + attempt.getNodeHttpAddress().split(":")[0] + ":"
          + attempt.getShufflePort()));
+      }else{
+    	  
+    	tce.setMapOutputServerAddress("https://");  
+      }
       tce.setStatus(status);
       tce.setAttemptId(attempt.getID());
       int runTime = 0;
@@ -743,8 +750,24 @@ public abstract class TaskImpl implements Task, EventHandler<TaskEvent> {
   }
 
   private void sendTaskSucceededEvents() {
-    eventHandler.handle(new JobTaskEvent(taskId, TaskState.SUCCEEDED));
-    LOG.info("Task succeeded with attempt " + successfulAttempt);
+	JobTaskEvent jobTaskEvent = new JobTaskEvent(taskId, TaskState.SUCCEEDED);
+	long    totalTime   = this.getFinishTime() - this.getLaunchTime();
+	long    HDFSRecords = this.getSuccessfulAttempt().getCounters().findCounter(TaskCounter.MAP_INPUT_RECORDS).getValue();
+	long    executionTime  = this.getSuccessfulAttempt().getEndExecutionTime() - this.getSuccessfulAttempt().getBeginExecutionTime();
+	double  executionSpeed = HDFSRecords*1.0 / executionTime*1.0;
+	double  executionRatio = 1.0*executionTime/ totalTime;
+	LOG.info("inform");
+	LOG.info("hdfsRecrds:"+HDFSRecords);
+	LOG.info("excutuinTime:"+executionTime);
+	LOG.info("totalTime:"+executionTime);
+	LOG.info("excutionSpeed:"+executionSpeed);
+	LOG.info("excutionRatio:"+executionRatio);
+	LOG.info("host:"+this.getSuccessfulAttempt().getNodeId().getHost());
+	LOG.info("/inform");
+	jobTaskEvent.setTaskExecutionTime((long)executionSpeed);
+	jobTaskEvent.setTaskExecutionRatio(executionRatio);
+	jobTaskEvent.setAttemptId(successfulAttempt);
+    eventHandler.handle(jobTaskEvent);
     if (historyTaskStartGenerated) {
       TaskFinishedEvent tfe = createTaskFinishedEvent(this,
           TaskStateInternal.SUCCEEDED);
@@ -940,7 +963,6 @@ public abstract class TaskImpl implements Task, EventHandler<TaskEvent> {
       task.finishedAttempts.add(taskAttemptId);
       task.inProgressAttempts.remove(taskAttemptId);
       task.successfulAttempt = taskAttemptId;
-      task.sendTaskSucceededEvents();
       for (TaskAttempt attempt : task.attempts.values()) {
         if (attempt.getID() != task.successfulAttempt &&
             // This is okay because it can only talk us out of sending a
@@ -953,6 +975,7 @@ public abstract class TaskImpl implements Task, EventHandler<TaskEvent> {
         }
       }
       task.finished(TaskStateInternal.SUCCEEDED);
+      task.sendTaskSucceededEvents();
     }
   }
 
@@ -996,6 +1019,8 @@ public abstract class TaskImpl implements Task, EventHandler<TaskEvent> {
     public TaskStateInternal transition(TaskImpl task, TaskEvent event) {
       TaskAttemptId taskAttemptId =
           ((TaskTAttemptEvent) event).getTaskAttemptID();
+      LOG.info("receive attempt killed from"+task.getID().toString());
+      
       task.handleTaskAttemptCompletion(taskAttemptId, taCompletionEventStatus);
       task.finishedAttempts.add(taskAttemptId);
       // check whether all attempts are finished
@@ -1032,6 +1057,19 @@ public abstract class TaskImpl implements Task, EventHandler<TaskEvent> {
     }
   }
 
+  
+  private static class AttemptReleaseTransition implements 
+    SingleArcTransition<TaskImpl, TaskEvent>{
+
+	@Override
+	     public void transition(TaskImpl operand, TaskEvent event) {
+		
+		
+	}
+	    
+  }
+      
+  
   private static class AttemptFailedTransition implements
     MultipleArcTransition<TaskImpl, TaskEvent, TaskStateInternal> {
 
@@ -1227,7 +1265,7 @@ public abstract class TaskImpl implements Task, EventHandler<TaskEvent> {
         task.killUnfinishedAttempt
             (attempt, "Task KILL is received. Killing attempt!");
       }
-
+      
       task.inProgressAttempts.clear();
     }
   }

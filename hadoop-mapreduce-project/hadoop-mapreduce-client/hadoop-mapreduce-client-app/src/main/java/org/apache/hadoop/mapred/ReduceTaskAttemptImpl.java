@@ -20,6 +20,7 @@ package org.apache.hadoop.mapred;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.MRJobConfig;
+import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.TypeConverter;
 import org.apache.hadoop.mapreduce.security.token.JobTokenIdentifier;
 import org.apache.hadoop.mapreduce.v2.api.records.TaskId;
@@ -57,7 +58,7 @@ public class ReduceTaskAttemptImpl extends TaskAttemptImpl {
           numMapTasks, 1); // YARN doesn't have the concept of slots per task, set it as 1.
   reduceTask.setUser(conf.get(MRJobConfig.USER_NAME));
   reduceTask.setConf(conf);
- // reduceTask.setTaskType(TaskType.REDUCE);
+  reduceTask.setTaskType(TaskType.REDUCE);
     return reduceTask;
   }
 

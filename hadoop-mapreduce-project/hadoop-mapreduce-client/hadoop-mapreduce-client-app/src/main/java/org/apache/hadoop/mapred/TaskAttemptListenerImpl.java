@@ -343,7 +343,15 @@ public class TaskAttemptListenerImpl extends CompositeService
     // conversions and unnecessary heap usage.
     taskAttemptStatus.counters = new org.apache.hadoop.mapreduce.Counters(
       taskStatus.getCounters());
-
+    
+    //task current time, we set this because different machines may have different clocks
+    
+    taskAttemptStatus.currentTime = taskStatus.getCurrentTime();
+    
+    //Map Begin time set by the task(map only)
+    if(taskStatus.getIsMap() && taskStatus.getMapBeginTime() !=0 ){
+      taskAttemptStatus.mapBeginTime = taskStatus.getMapBeginTime();
+    }
     // Map Finish time set by the task (map only)
     if (taskStatus.getIsMap() && taskStatus.getMapFinishTime() != 0) {
       taskAttemptStatus.mapFinishTime = taskStatus.getMapFinishTime();
@@ -497,11 +505,24 @@ public class TaskAttemptListenerImpl extends CompositeService
     // jvmIDToActiveAttemptMap before it checks launchedJVMs.
  
     // remove the mappings if not already removed
-    launchedJVMs.remove(jvmID);
+	if(launchedJVMs.contains(jvmID)){
+    
+		launchedJVMs.remove(jvmID);
+    
+	}
+  
+    if(jvmIDToActiveAttemptMap.containsKey(jvmID)){
+    	
     jvmIDToActiveAttemptMap.remove(jvmID);
-
-    //unregister this attempt
+   
+    }
+    
+    if(taskHeartbeatHandler.contains(attemptID)){
+    	
     taskHeartbeatHandler.unregister(attemptID);
+    
+    }
+  
   }
 
   @Override

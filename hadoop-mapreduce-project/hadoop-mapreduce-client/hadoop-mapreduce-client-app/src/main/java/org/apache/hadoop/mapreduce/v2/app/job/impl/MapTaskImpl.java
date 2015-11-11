@@ -21,7 +21,6 @@ package org.apache.hadoop.mapreduce.v2.app.job.impl;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.MapTaskAttemptImpl;
-import org.apache.hadoop.mapred.MultiMapTaskAttemptImpl;
 import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.security.token.JobTokenIdentifier;
 import org.apache.hadoop.mapreduce.split.JobSplit.TaskSplitMetaInfo;
@@ -39,8 +38,7 @@ import org.apache.hadoop.yarn.util.Clock;
 public class MapTaskImpl extends TaskImpl {
 
   private final TaskSplitMetaInfo taskSplitMetaInfo;
-  private final String[] nodeList;
-
+  
   public MapTaskImpl(JobId jobId, int partition, EventHandler eventHandler,
       Path remoteJobConfFile, JobConf conf,
       TaskSplitMetaInfo taskSplitMetaInfo,
@@ -52,24 +50,11 @@ public class MapTaskImpl extends TaskImpl {
         conf, taskAttemptListener, jobToken, credentials, clock,
         appAttemptId, metrics, appContext);
     this.taskSplitMetaInfo = taskSplitMetaInfo;
-    this.nodeList = null;
+  
   }
   
   
-  public MapTaskImpl(JobId jobId, int partition, EventHandler eventHandler,
-	      Path remoteJobConfFile, JobConf conf,
-	      String[] nodeList,
-	      TaskAttemptListener taskAttemptListener,
-	      Token<JobTokenIdentifier> jobToken,
-	      Credentials credentials, Clock clock,
-	      int appAttemptId, MRAppMetrics metrics, AppContext appContext) {
-	    super(jobId, TaskType.MAP, partition, eventHandler, remoteJobConfFile,
-	        conf, taskAttemptListener, jobToken, credentials, clock,
-	        appAttemptId, metrics, appContext);
-	    this.nodeList = nodeList;
-	    this.taskSplitMetaInfo=null;
-	    
-	  }
+  
 
   @Override
   protected int getMaxAttempts() {
@@ -78,11 +63,9 @@ public class MapTaskImpl extends TaskImpl {
 
   @Override
   protected TaskAttemptImpl createAttempt() {
-	
-	 //I should add configure jude here
 	  
-    return new MultiMapTaskAttemptImpl(getID(), nextAttemptNumber,
-        eventHandler, taskAttemptListener,jobFile,partition,conf,nodeList,
+    return new MapTaskAttemptImpl(getID(), nextAttemptNumber,
+        eventHandler, jobFile,partition,taskSplitMetaInfo,conf,taskAttemptListener,
         jobToken, credentials, clock, appContext);
   }
 
@@ -99,9 +82,7 @@ public class MapTaskImpl extends TaskImpl {
    * @return a String formatted as a comma-separated list of splits.
    */
   @Override
-  protected String getSplitsAsString() {
-	 
-	/*  
+  protected String getSplitsAsString() {  
     String[] splits = getTaskSplitMetaInfo().getLocations();
     if (splits == null || splits.length == 0)
     return "";
@@ -111,7 +92,6 @@ public class MapTaskImpl extends TaskImpl {
       sb.append(splits[i]);
     }
     return sb.toString();
-    */	  
-   return "multisplit";
+     
   }
 }

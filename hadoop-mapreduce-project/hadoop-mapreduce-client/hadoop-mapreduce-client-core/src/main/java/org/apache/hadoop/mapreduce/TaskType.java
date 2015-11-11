@@ -27,5 +27,5 @@ import org.apache.hadoop.classification.InterfaceStability;
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public enum TaskType {
-  MAP, REDUCE, JOB_SETUP, JOB_CLEANUP, TASK_CLEANUP
+  MAP, REDUCE, JOB_SETUP, JOB_CLEANUP, TASK_CLEANUP, MULTI_MAP
 }

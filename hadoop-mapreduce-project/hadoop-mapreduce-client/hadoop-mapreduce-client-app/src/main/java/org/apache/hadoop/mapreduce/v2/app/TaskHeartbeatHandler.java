@@ -126,6 +126,10 @@ public class TaskHeartbeatHandler extends AbstractService {
   public void unregister(TaskAttemptId attemptID) {
     runningAttempts.remove(attemptID);
   }
+  
+  public boolean contains(TaskAttemptId attemptID){
+	return runningAttempts.containsKey(attemptID);  
+  }
 
   private class PingChecker implements Runnable {
 

@@ -26,7 +26,8 @@ public interface ContainerAllocator extends EventHandler<ContainerAllocatorEvent
 
     CONTAINER_REQ,
     CONTAINER_DEALLOCATE,
-    CONTAINER_FAILED
+    CONTAINER_FAILED,
+    CONTAINER_NODE_SPEED
   }
 
 }

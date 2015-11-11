@@ -346,8 +346,10 @@ public class MapTask extends Task {
     }
 
     if (useNewApi) {
+      LOG.info("run new API");	
       runNewMapper(job, splitMetaInfo, umbilical, reporter);
     } else {
+      LOG.info("run Old API");
       runOldMapper(job, splitMetaInfo, umbilical, reporter);
     }
     done(umbilical, reporter);
@@ -788,6 +790,8 @@ public class MapTask extends Task {
               mapContext);
 
     try {
+      taskStatus.setMapBeginTime(System.currentTimeMillis());
+      LOG.info("set map begin time here:    "+taskStatus.getMapBeginTime());
       input.initialize(split, mapperContext);
       mapper.run(mapperContext);
       mapPhase.complete();

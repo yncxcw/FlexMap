@@ -124,7 +124,7 @@ class EventFetcher<K,V> extends Thread {
               maxEventsToFetch,
               (org.apache.hadoop.mapred.TaskAttemptID)reduce);
       events = update.getMapTaskCompletionEvents();
-      LOG.debug("Got " + events.length + " map completion events from " +
+      LOG.info("Got " + events.length + " map completion events from " +
                fromEventIdx);
 
       assert !update.shouldReset() : "Unexpected legacy state";

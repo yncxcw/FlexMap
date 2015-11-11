@@ -255,9 +255,9 @@ abstract public class Task implements Writable, Configurable {
    * Set the type for this task.
    * @return null
    */
-  public void setTaskType(TaskType taskType){
+  public void setTaskType(TaskType map){
 	  
-	  this.taskType=taskType;
+	  this.taskType=map;
   }
   
   
@@ -574,6 +574,8 @@ abstract public class Task implements Writable, Configurable {
   private AtomicBoolean taskDone = new AtomicBoolean(false);
   
   public abstract boolean isMapTask();
+  
+
 
   public Progress getProgress() { return taskProgress; }
 
@@ -758,10 +760,14 @@ abstract public class Task implements Writable, Configurable {
 
           if (sendProgress) {
             // we need to send progress update
+           	  
             updateCounters();
-            taskStatus.statusUpdate(taskProgress.get(),
+            taskStatus.setCurrentTime(System.currentTimeMillis());
+            taskStatus.statusUpdate(
+            		                taskProgress.get(),
                                     taskProgress.toString(), 
-                                    counters);
+                                    counters
+                                    );
             taskFound = umbilical.statusUpdate(taskId, taskStatus);
             taskStatus.clearStatus();
           }

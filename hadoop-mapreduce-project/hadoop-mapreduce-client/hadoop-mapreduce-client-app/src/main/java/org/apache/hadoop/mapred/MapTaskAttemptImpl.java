@@ -20,6 +20,7 @@ package org.apache.hadoop.mapred;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.MRJobConfig;
+import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.TypeConverter;
 import org.apache.hadoop.mapreduce.security.token.JobTokenIdentifier;
 import org.apache.hadoop.mapreduce.split.JobSplit.TaskSplitMetaInfo;
@@ -35,7 +36,7 @@ import org.apache.hadoop.yarn.util.Clock;
 @SuppressWarnings("rawtypes")
 public class MapTaskAttemptImpl extends TaskAttemptImpl {
 
-  private final TaskSplitMetaInfo splitInfo;
+  private TaskSplitMetaInfo splitInfo=null;
 
   public MapTaskAttemptImpl(TaskId taskId, int attempt, 
       EventHandler eventHandler, Path jobFile, 
@@ -50,6 +51,11 @@ public class MapTaskAttemptImpl extends TaskAttemptImpl {
     this.splitInfo = splitInfo;
   }
 
+  public TaskSplitMetaInfo getTaskSplitMetaInfo(){
+	  
+	  return splitInfo;
+  }
+  
   @Override
   public Task createRemoteTask() {
     //job file name is set in TaskAttempt, setting it null here
@@ -60,7 +66,7 @@ public class MapTaskAttemptImpl extends TaskAttemptImpl {
           splitInfo.getSplitIndex(), 1); // YARN doesn't have the concept of slots per task, set it as 1.
     mapTask.setUser(conf.get(MRJobConfig.USER_NAME));
     mapTask.setConf(conf);
-    //mapTask.setTaskType(TaskType.MAP);
+    mapTask.setTaskType(TaskType.MAP);
     return mapTask;
   }
 

@@ -57,7 +57,8 @@ public class WrappedProgressSplitsBlock extends ProgressSplitsBlock {
   
   public double[][] burst() {
 	  
-	//added by wei for debugging  
+	//added by wei for debugging
+	/*  
     LOG.info("wrappedProgressWallclockTime size:"+wrappedProgressWallclockTime.getValue().length);
     print(wrappedProgressWallclockTime.getValue());
         
@@ -84,37 +85,37 @@ public class WrappedProgressSplitsBlock extends ProgressSplitsBlock {
     
     LOG.info("wrappedProgressSpeedFileWrite size:"+wrappedProgressSpeedFileWrite.getValue().length);
     print(wrappedProgressSpeedFileWrite.getValue());
-    
+    */
     double [][] results = new double[9][];
 
-    LOG.info("Start:");
+    //LOG.info("Start:");
     results[WALLCLOCK_TIME_INDEX] = new double[wrappedProgressWallclockTime.getValue().length];
     for(int i=0;i<wrappedProgressWallclockTime.getValue().length;i++){
     	
     	results[WALLCLOCK_TIME_INDEX][i] = (double)wrappedProgressWallclockTime.getValue()[i];
     }
-    LOG.info("finish progressWallclockTime");
+   // LOG.info("finish progressWallclockTime");
     
     results[CPU_TIME_INDEX] = new double[wrappedProgressCPUTime.getValue().length];
     for(int i=0;i<wrappedProgressCPUTime.getValue().length;i++){
     	
     	results[CPU_TIME_INDEX][i] = (double)wrappedProgressCPUTime.getValue()[i];
     } 
-    LOG.info("finish progressCPUTime"); 
+    //LOG.info("finish progressCPUTime"); 
     
     results[VIRTUAL_MEMORY_KBYTES_INDEX]= new double[wrappedProgressVirtualMemoryKbytes.getValue().length];
     for(int i=0;i<wrappedProgressVirtualMemoryKbytes.getValue().length;i++){
     	
     	results[VIRTUAL_MEMORY_KBYTES_INDEX][i] = (double)wrappedProgressVirtualMemoryKbytes.getValue()[i];
     }
-    LOG.info("finish progressVirtualMemoryKbytes");
+    //LOG.info("finish progressVirtualMemoryKbytes");
     
     results[PHYSICAL_MEMORY_KBYTES_INDEX]=new double[wrappedProgressPhysicalMemoryKbytes.getValue().length];
     for(int i=0;i<wrappedProgressPhysicalMemoryKbytes.getValue().length;i++){
     	
     	results[PHYSICAL_MEMORY_KBYTES_INDEX][i] = (double)wrappedProgressPhysicalMemoryKbytes.getValue()[i];
     }
-    LOG.info("finish progressPhysicalMemoryKbytes");
+    //LOG.info("finish progressPhysicalMemoryKbytes");
     
     //results[WALLCLOCK_TIME_INDEX] = (double [])progressWallclockTime.getValues();
     //results[CPU_TIME_INDEX] = progressCPUTime.getValues();
@@ -126,35 +127,35 @@ public class WrappedProgressSplitsBlock extends ProgressSplitsBlock {
       
     	 results[PROGRESS_SPEED_TASKATTEMPT_INDEX][i] = wrappedProgressSpeedTaskAttempt.getValue()[i];
     }
-    LOG.info("finish progressSpeedTaskAttempt");
+   // LOG.info("finish progressSpeedTaskAttempt");
     
     results[PROGRESS_SPEED_DFSREAD_INDEX] = new double[wrappedProgressSpeedHdfsRead.getValue().length];
     for(int i=0;i<wrappedProgressSpeedHdfsRead.getValue().length;i++){
         
    	     results[PROGRESS_SPEED_DFSREAD_INDEX][i] = wrappedProgressSpeedHdfsRead.getValue()[i];
     }
-    LOG.info("finish progressSpeedDFSRead");
+    //LOG.info("finish progressSpeedDFSRead");
     
     results[PROGRESS_SPEED_DFSWRITE_INDEX]=new double[wrappedProgressSpeedHdfsWrite.getValue().length];
     for(int i=0;i<wrappedProgressSpeedHdfsWrite.getValue().length;i++){
         
   	     results[PROGRESS_SPEED_DFSWRITE_INDEX][i] = wrappedProgressSpeedHdfsWrite.getValue()[i];
     }
-    LOG.info("finish progressSpeedDFSWrite");
+    //LOG.info("finish progressSpeedDFSWrite");
     
     results[PROGRESS_SPEED_FILEREAD_INDEX] = new double[wrappedProgressSpeedFileRead.getValue().length];
     for(int i=0;i<wrappedProgressSpeedFileRead.getValue().length;i++){
         
  	     results[PROGRESS_SPEED_FILEREAD_INDEX][i] = wrappedProgressSpeedFileRead.getValue()[i];
     }
-    LOG.info("finish progressSpeedFileRead");
+    //LOG.info("finish progressSpeedFileRead");
     
     results[PROGRESS_SPEED_FILEWRITE_INDEX]= new double[wrappedProgressSpeedFileWrite.getValue().length];
     for(int i=0;i<wrappedProgressSpeedFileWrite.getValue().length;i++){
         
  	     results[PROGRESS_SPEED_FILEWRITE_INDEX][i] = wrappedProgressSpeedFileWrite.getValue()[i];
     }
-    LOG.info("finish progressSpeedFileWrite");
+    //LOG.info("finish progressSpeedFileWrite");
     
     return results;
     

@@ -19,5 +19,5 @@
 package org.apache.hadoop.mapreduce.v2.app.job;
 
 public enum TaskStateInternal {
-  NEW, SCHEDULED, RUNNING, SUCCEEDED, FAILED, KILL_WAIT, KILLED
+  NEW, SCHEDULED, RUNNING, SUCCEEDED, FAILED, KILL_WAIT, KILLED,ABORT
 }

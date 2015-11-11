@@ -30,6 +30,14 @@ public interface MRJobConfig {
 
   // Put all of the attribute names in here so that Job and JobContext are
   // consistent.
+	
+  public static final String BLOCKS_UNIT_FAST_LIMIT = "mapreduce.job.block.fastlimit";
+  
+  public static final String BLOCKS_UNIT_LIMIT = "mapreduce.job.block.limit";
+  
+  public static final String BOCK_UNIT_UNIT   ="mapreduce.job.block.unit";	
+  
+  
   public static final String INPUT_FORMAT_CLASS_ATTR = "mapreduce.job.inputformat.class";
 
   public static final String MAP_CLASS_ATTR = "mapreduce.job.map.class";
