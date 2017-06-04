@@ -10,7 +10,7 @@ We design and implement FlexMap which dynamic sizing map size at runtime to adap
 FlexMap is to assign data to each map task based on node speed. You can refer our IPDPS 2017 paper for more details.
 
 ## Usage
-1. Down Hadoop source code from http://hadoop.apache.org/. Our implementation is based on Haddop-2.6.0
+1. Download Hadoop source code from http://hadoop.apache.org/. Our implementation is based on Haddop-2.6.0
 2. Copy folder hadoop-mapreduce-project and hadoop-hdfs to hadoop source folder.
 3. Compile and install(refer BUILD.txt)
 
