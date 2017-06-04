@@ -1,4 +1,4 @@
-# Yarn-SBlock
+# FlexMap
 The prototype of our research project FlexMap. FlexMap is a performance heterogeneous mitigation Hadoop MapReduce 
 designed for hardware heterogeneous cluster and virtualized cluster.
 
